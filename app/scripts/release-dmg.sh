@@ -27,7 +27,7 @@ fi
 [[ $(git rev-parse "$tag^{commit}") == $(git rev-parse HEAD) ]] ||
   fail "$tag must point at HEAD"
 
-for command in bun codesign hdiutil shasum node; do
+for command in bun codesign hdiutil shasum node rustup; do
   command -v "$command" >/dev/null || fail "missing required command: $command"
 done
 
@@ -69,6 +69,7 @@ config.version = version
 fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
 NODE
 
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
 bun --cwd=app run tauri build --target universal-apple-darwin --bundles dmg
 
 bundle_dir=target/universal-apple-darwin/release/bundle/dmg
