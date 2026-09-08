@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "release:dmg": "bash ./scripts/release-dmg.sh",
     "android": "tauri android dev",
     "test": "bun run --bun vitest run",
     "test:watch": "vitest",

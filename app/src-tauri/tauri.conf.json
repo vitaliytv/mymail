@@ -34,7 +34,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRGNjE4NzgyQ0E1NENFNjYKUldSbXpsVEtnb2RoVDBSTUViMXl1SXAzNDJyQ0xJMUNIR0F3THdzaEhpc091NjZsNFIrWlhhdGgK",
-      "endpoints": ["https://github.com/vitaliytv/mlmail/releases/latest/download/latest.json"]
+      "endpoints": ["https://git.7n.ai/vitaliytv/mymail/releases/latest/download/latest.json"]
     }
   }
 }
