@@ -63,20 +63,20 @@ config.version = version
 fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
 NODE
 
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-CI=true bun --cwd=app run tauri build --target universal-apple-darwin --bundles app,dmg
+rustup target add aarch64-apple-darwin
+CI=true bun --cwd=app run tauri build --target aarch64-apple-darwin --bundles app,dmg
 
-bundle_dir=target/universal-apple-darwin/release/bundle/dmg
+bundle_dir=target/aarch64-apple-darwin/release/bundle/dmg
 dmg=$(find "$bundle_dir" -maxdepth 1 -type f -name '*.dmg' -print -quit)
 [[ -n $dmg ]] || fail "Tauri did not create a DMG in $bundle_dir"
-updater_dir=target/universal-apple-darwin/release/bundle/macos
+updater_dir=target/aarch64-apple-darwin/release/bundle/macos
 updater=$(find "$updater_dir" -maxdepth 1 -type f -name '*.app.tar.gz' -print -quit)
 [[ -n $updater ]] || fail "Tauri did not create an updater archive in $updater_dir"
 [[ -f "$updater.sig" ]] || fail "Tauri did not create an updater signature for $updater"
 
 mkdir -p "$output_dir"
-dmg_artifact="MyMail_${version}_universal.dmg"
-updater_artifact="MyMail_${version}_universal.app.tar.gz"
+dmg_artifact="MyMail_${version}_arm64.dmg"
+updater_artifact="MyMail_${version}_arm64.app.tar.gz"
 cp "$dmg" "$output_dir/$dmg_artifact"
 cp "$updater" "$output_dir/$updater_artifact"
 cp "$updater.sig" "$output_dir/$updater_artifact.sig"
@@ -104,7 +104,6 @@ fs.writeFileSync(
       pub_date: new Date().toISOString(),
       platforms: {
         'darwin-aarch64': platform,
-        'darwin-x86_64': platform,
       },
     },
     null,

@@ -4,7 +4,7 @@
 
 ## Локальний DMG-реліз
 
-Android APK збирає Forgejo. Підписаний універсальний macOS DMG готується локально на Mac, без GitHub Actions і без збереження signing secrets у репозиторії.
+Android APK збирає Forgejo. Підписаний macOS ARM64 DMG готується локально на Mac, без GitHub Actions і без збереження signing secrets у репозиторії. Intel Mac не підтримуються у нових desktop releases.
 
 Спочатку створіть локальний Infisical project config для vitaliytv-kfse (це одноразова локальна дія, конфіг не комітиться):
 
