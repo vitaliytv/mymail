@@ -1,0 +1,24 @@
+name: Lint workflows
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      [".forgejo/workflows/**", ".github/workflows/**", ".github/actions/**"]
+  pull_request:
+    branches: [main, dev]
+    paths:
+      [".forgejo/workflows/**", ".github/workflows/**", ".github/actions/**"]
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: npx prettier --check .forgejo/workflows .github/workflows .github/actions

@@ -1,0 +1,42 @@
+name: Clean abandoned branches
+
+on:
+  schedule:
+    - cron: "0 1 15 * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest-arm64
+    steps:
+      - name: Delete stale non-default branches
+        run: |
+          node <<'NODE'
+          (async () => {
+            const api = `${process.env.FORGEJO_API_URL}/repos/${process.env.FORGEJO_REPOSITORY}/branches`;
+            const headers = { Authorization: `token ${process.env.FORGEJO_TOKEN}` };
+            const protectedBranches = new Set(['main', 'dev']);
+            const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            let deleted = 0;
+            for (let page = 1; ; page += 1) {
+              const response = await fetch(`${api}?page=${page}&limit=50`, { headers });
+              if (!response.ok) throw new Error(`list branches failed: ${response.status}`);
+              const branches = await response.json();
+              if (!branches.length) break;
+              for (const branch of branches) {
+                const timestamp = branch.commit?.timestamp;
+                if (!protectedBranches.has(branch.name) && timestamp && new Date(timestamp).getTime() < cutoff) {
+                  const remove = await fetch(`${api}/${encodeURIComponent(branch.name)}`, { method: 'DELETE', headers });
+                  if (!remove.ok) throw new Error(`delete branch ${branch.name} failed: ${remove.status}`);
+                  deleted += 1;
+                }
+              }
+              if (branches.length < 50) break;
+            }
+            console.log(`deleted ${deleted} stale branches`);
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE

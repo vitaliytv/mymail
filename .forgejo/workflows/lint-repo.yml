@@ -1,0 +1,21 @@
+name: Lint repo-wide
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  lint-repo:
+    runs-on: ubuntu-latest-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun-deps
+      - run: bunx n-rules lint --repo-wide --no-fix

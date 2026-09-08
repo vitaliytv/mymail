@@ -1,0 +1,47 @@
+name: Lint Text
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      [
+        "**/*.js",
+        "**/*.ts",
+        "**/*.vue",
+        "**/*.html",
+        "**/*.css",
+        "**/*.scss",
+        "**/*.less",
+        "**/*.json",
+        "**/*.jsonc",
+        "**/*.yaml",
+        "**/*.yml",
+        "**/*.toml",
+        "**/*.xml",
+        "**/*.md",
+        "**/*.mdc",
+        "**/*.mdс",
+        "**/*.txt",
+        "**/*.go",
+        "**/*.py",
+        "**/*.php",
+        "**/*.sh",
+      ]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  text:
+    runs-on: ubuntu-latest-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun-deps
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - run: curl -sSfL https://git.io/JLbXn | sh -s -- -b /usr/local/bin
+      - run: bunx n-rules lint text --no-fix

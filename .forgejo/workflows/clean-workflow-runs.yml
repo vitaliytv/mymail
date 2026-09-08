@@ -1,0 +1,42 @@
+name: Clean completed workflow runs
+
+on:
+  schedule:
+    - cron: "0 1 16 * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest-arm64
+    steps:
+      - name: Delete completed runs older than 31 days
+        run: |
+          node <<'NODE'
+          (async () => {
+            const api = `${process.env.FORGEJO_API_URL}/repos/${process.env.FORGEJO_REPOSITORY}/actions/runs`;
+            const headers = { Authorization: `token ${process.env.FORGEJO_TOKEN}` };
+            const cutoff = Date.now() - 31 * 24 * 60 * 60 * 1000;
+            let deleted = 0;
+            for (let page = 1; ; page += 1) {
+              const response = await fetch(`${api}?page=${page}&limit=50`, { headers });
+              if (!response.ok) throw new Error(`list runs failed: ${response.status}`);
+              const body = await response.json();
+              const runs = body.workflow_runs ?? body;
+              if (!runs.length) break;
+              for (const run of runs) {
+                const completed = run.status === 'success' || run.status === 'failure' || run.status === 'cancelled' || run.status === 'skipped';
+                if (completed && new Date(run.updated_at ?? run.created_at).getTime() < cutoff) {
+                  const remove = await fetch(`${api}/${run.id}`, { method: 'DELETE', headers });
+                  if (!remove.ok) throw new Error(`delete run ${run.id} failed: ${remove.status}`);
+                  deleted += 1;
+                }
+              }
+              if (runs.length < 50) break;
+            }
+            console.log(`deleted ${deleted} completed workflow runs`);
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE

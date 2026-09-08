@@ -1,0 +1,59 @@
+name: Changelog Release
+
+on:
+  push:
+    branches: [main]
+    paths: [app/.changes/**]
+  workflow_dispatch: {}
+
+concurrency:
+  group: changelog-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: "!startsWith(forgejo.event.head_commit.message, 'release:')"
+    runs-on: release-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Configure Forgejo push identity
+        run: |
+          git config user.name "forgejo-actions[bot]"
+          git config user.email "forgejo-actions[bot]@users.noreply.git.7n.ai"
+          git remote set-url origin "https://x-access-token:${FORGEJO_TOKEN}@${FORGEJO_SERVER_URL#https://}/${FORGEJO_REPOSITORY}.git"
+      - name: Run release
+        run: npx @nitra/cursor release
+      - name: Detect produced release
+        id: rel
+        run: |
+          if git log -1 --pretty=%s | grep -q '^release:'; then
+            VER=$(node -p "require('./app/package.json').version")
+            echo "version=$VER" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Tag and push
+        if: steps.rel.outputs.version
+        run: |
+          VER="${{ steps.rel.outputs.version }}"
+          git tag "app@$VER" 2>/dev/null || true
+          git tag "v$VER"
+          git push origin HEAD:main "refs/tags/app@$VER" "refs/tags/v$VER"
+      - name: Dispatch Forgejo release workflow
+        if: steps.rel.outputs.version
+        env:
+          RELEASE_REF: v${{ steps.rel.outputs.version }}
+        run: |
+          node <<'NODE'
+          (async () => {
+            const path = `${process.env.FORGEJO_API_URL}/repos/${process.env.FORGEJO_REPOSITORY}/actions/workflows/release.yml/dispatches`;
+            const response = await fetch(path, {
+              method: 'POST',
+              headers: { Authorization: `token ${process.env.FORGEJO_TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ref: process.env.RELEASE_REF }),
+            });
+            if (!response.ok) throw new Error(`release dispatch failed: ${response.status}`);
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE

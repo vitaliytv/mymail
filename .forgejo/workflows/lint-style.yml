@@ -1,0 +1,23 @@
+name: StyleLint
+
+on:
+  push:
+    branches: [main, dev]
+    paths: ["**/*.css", "**/*.scss", "**/*.vue"]
+  pull_request:
+    branches: [main, dev]
+    paths: ["**/*.css", "**/*.scss", "**/*.vue"]
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  stylelint:
+    runs-on: ubuntu-latest-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun-deps
+      - run: npx stylelint '**/*.{css,scss,vue}'

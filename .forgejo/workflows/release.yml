@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  create-release:
+    runs-on: release-arm64
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: Create or reuse Forgejo release
+        id: release
+        run: |
+          node <<'NODE'
+          (async () => {
+            const tag = process.env.GITHUB_REF_NAME;
+            const api = `${process.env.FORGEJO_API_URL}/repos/${process.env.FORGEJO_REPOSITORY}`;
+            const headers = { Authorization: `token ${process.env.FORGEJO_TOKEN}`, 'Content-Type': 'application/json' };
+            let response = await fetch(`${api}/releases/tags/${encodeURIComponent(tag)}`, { headers });
+            if (response.status === 404) {
+              response = await fetch(`${api}/releases`, {
+                method: 'POST', headers,
+                body: JSON.stringify({ tag_name: tag, name: `mlmail ${tag}`, draft: false, prerelease: false }),
+              });
+            }
+            if (!response.ok) throw new Error(`release request failed: ${response.status}`);
+            const release = await response.json();
+            require('fs').appendFileSync(process.env.GITHUB_OUTPUT, `release_id=${release.id}\n`);
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE
+
+  build-android:
+    needs: create-release
+    runs-on: release-arm64
+    enable-openid-connect: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun-deps
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+      - name: Sync app version from tag
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          node -e "const fs=require('fs');const f='app/src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(f));c.version=process.argv[1];fs.writeFileSync(f,JSON.stringify(c,null,2)+'\\n')" "$VER"
+      - name: Fetch Android secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: oidc
+          domain: https://secret.7n.ai
+          project-slug: vitaliytv-kfse
+          identity-id: ${{ vars.INFISICAL_FORGEJO_IDENTITY_ID }}
+          env-slug: main
+          secret-path: /mlmail
+      - name: Configure release signing
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/keystore.jks"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEYSTORE_PASSWORD"
+          } > app/src-tauri/gen/android/keystore.properties
+      - name: Build signed APK
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: bun --cwd=app run tauri android build --apk
+      - name: Upload APK to Forgejo release
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          SRC=$(find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name '*.apk' | head -1)
+          curl --fail --silent --show-error \
+            --header "Authorization: token ${FORGEJO_TOKEN}" \
+            --form "attachment=@${SRC};filename=mlmail_${VER}_universal.apk" \
+            "${FORGEJO_API_URL}/repos/${FORGEJO_REPOSITORY}/releases/${RELEASE_ID}/assets?name=mlmail_${VER}_universal.apk"
