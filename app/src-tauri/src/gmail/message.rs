@@ -184,9 +184,12 @@ fn collect_attachments(node: &Value, html_body: Option<&str>, out: &mut Vec<Atta
     }
 }
 
+/// Returns meaningful plain text, preferring `text/plain` and falling back to HTML.
 pub fn extract_plain_text(payload: &Value) -> String {
     if let Some(text) = find_part(payload, "text/plain") {
-        return text;
+        if !text.trim().is_empty() {
+            return text;
+        }
     }
     if let Some(html) = find_part(payload, "text/html") {
         return strip_html(&html);
@@ -349,6 +352,18 @@ mod tests {
             ]
         });
         assert_eq!(extract_plain_text(&payload), "only html");
+    }
+
+    #[test]
+    fn extract_plain_text_falls_back_to_html_when_plain_is_empty() {
+        let payload = json!({
+            "mimeType": "multipart/alternative",
+            "parts": [
+                {"mimeType": "text/plain", "body": {"data": b64url("  \n")}},
+                {"mimeType": "text/html", "body": {"data": b64url("<p>calendar event</p>")}}
+            ]
+        });
+        assert_eq!(extract_plain_text(&payload), "calendar event");
     }
 
     #[test]
