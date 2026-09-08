@@ -46,22 +46,15 @@ config=app/src-tauri/tauri.conf.json
 output_dir="dist/MyMail-v$version"
 [[ ! -e $output_dir ]] || fail "refusing to overwrite $output_dir"
 
-backup=$(mktemp "${TMPDIR:-/tmp}/mymail-tauri-conf.XXXXXX")
-
-cleanup() {
-  cp "$backup" "$config"
-  rm -f "$backup"
-}
-trap cleanup EXIT
-
-cp "$config" "$backup"
-node - "$config" "$version" <<'NODE'
-const [file, version] = process.argv.slice(2)
+config_version=$(node - "$config" <<'NODE'
+const [file] = process.argv.slice(2)
 const fs = require('fs')
 const config = JSON.parse(fs.readFileSync(file, 'utf8'))
-config.version = version
-fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
+process.stdout.write(config.version)
 NODE
+)
+[[ $config_version == "$version" ]] ||
+  fail "app/src-tauri/tauri.conf.json has version $config_version; xtask must prepare $version first"
 
 rustup target add aarch64-apple-darwin
 CI=true bun --cwd=app run tauri build --target aarch64-apple-darwin --bundles app,dmg
@@ -113,6 +106,8 @@ fs.writeFileSync(
 NODE
 
 echo "local release assets: $output_dir"
+echo "publish the verified version commit and tag with:"
+echo "  git push origin HEAD $tag"
 echo "upload with:"
 echo "  foc release upload $tag $output_dir/$dmg_artifact --repo vitaliytv/mymail"
 echo "  foc release upload $tag $output_dir/$updater_artifact --repo vitaliytv/mymail"

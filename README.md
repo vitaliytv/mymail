@@ -19,7 +19,7 @@ infisical --domain https://secret.7n.ai run --env=main --path=/apple --path=/upd
   cargo xtask release-assets X.Y.Z
 ```
 
-Команда перевіряє Developer ID signature усередині DMG і створює dist/MyMail-vX.Y.Z/: DMG, updater signature, SHA256SUMS і latest.json. Вона не створює тег, не змінює release і не завантажує файли. Надруковані наприкінці foc release upload команди — єдиний явний крок публікації в Forgejo release.
+Команда оновлює `app/src-tauri/tauri.conf.json` до `X.Y.Z`, створює локальний version commit і annotated tag `vX.Y.Z`, перевіряє Developer ID signature усередині DMG і створює `dist/MyMail-vX.Y.Z/`: DMG, updater archive, signature, SHA256SUMS і latest.json. Вона не пушить, не створює release і не завантажує файли: після успішної перевірки надруковані команди спершу публікують commit/tag у Forgejo, а потім завантажують assets до release.
 
 Далі, ми додаємо авторизацію на Google і там, і там.
 
