@@ -16,7 +16,7 @@ infisical --domain https://secret.7n.ai init
 
 ```sh
 infisical --domain https://secret.7n.ai run --env=main --path=/apple --path=/updater -- \
-  bun --cwd=app run release:dmg X.Y.Z
+  cargo xtask release-assets X.Y.Z
 ```
 
 Команда перевіряє Developer ID signature усередині DMG і створює dist/MyMail-vX.Y.Z/: DMG, updater signature, SHA256SUMS і latest.json. Вона не створює тег, не змінює release і не завантажує файли. Надруковані наприкінці foc release upload команди — єдиний явний крок публікації в Forgejo release.

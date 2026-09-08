@@ -3,7 +3,8 @@ resolver = "2"
 members = [
   "app/src-tauri",
   "app/src-tauri/plugins/booking-finder",
-  "app/src-tauri/plugins/draft-helper"
+  "app/src-tauri/plugins/draft-helper",
+  "xtask",
 ]
 
 [profile.release]
