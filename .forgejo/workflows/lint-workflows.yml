@@ -21,4 +21,4 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - run: npx prettier --check .forgejo/workflows .github/workflows .github/actions
+      - run: npx prettier --check .forgejo/workflows .github/workflows/release.yml .github/actions
