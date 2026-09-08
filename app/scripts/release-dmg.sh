@@ -70,7 +70,7 @@ fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
 NODE
 
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
-bun --cwd=app run tauri build --target universal-apple-darwin --bundles dmg
+CI=true bun --cwd=app run tauri build --target universal-apple-darwin --bundles dmg
 
 bundle_dir=target/universal-apple-darwin/release/bundle/dmg
 dmg=$(find "$bundle_dir" -maxdepth 1 -type f -name '*.dmg' -print -quit)
