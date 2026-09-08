@@ -238,7 +238,7 @@ watchEffect(() => {
   const email = auth.email.value
   const count = auth.inboxCount.value
   const version = appVersion.value
-  const appName = version ? `mlmail v${version}` : 'mlmail'
+  const appName = version ? `MyMail v${version}` : 'MyMail'
   let title
   if (email && count !== null) {
     title = `${appName} - ${email} - ${count}`

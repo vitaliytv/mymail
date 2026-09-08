@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "mlmail",
+  "productName": "MyMail",
   "version": "0.1.0",
   "identifier": "com.vitaliytv.mlmail",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "mlmail",
+        "title": "MyMail",
         "width": 800,
         "height": 600,
         "maximized": true

@@ -97,7 +97,7 @@ describe('Login.vue inbox count', () => {
     })
     const w = mountWithQuasar(Login)
     await flushPromises()
-    expect(document.title).toBe('mlmail vtest - u@e - 348')
+    expect(document.title).toBe('MyMail vtest - u@e - 348')
     w.unmount()
   })
 
@@ -114,7 +114,7 @@ describe('Login.vue inbox count', () => {
     expect(w.text()).toContain('Скринька порожня.')
     resolveCount(7)
     await flushPromises()
-    expect(document.title).toBe('mlmail vtest - u@e - 7')
+    expect(document.title).toBe('MyMail vtest - u@e - 7')
     w.unmount()
   })
 

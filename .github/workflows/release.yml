@@ -32,7 +32,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --title "mlmail $GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" --title "MyMail $GITHUB_REF_NAME" --generate-notes
           fi
           echo "release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" --jq .id)" >> "$GITHUB_OUTPUT"
 

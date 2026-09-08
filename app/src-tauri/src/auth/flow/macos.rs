@@ -13,7 +13,7 @@ const AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const SCOPES: &str = "openid email https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic";
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(300);
 
-const HTML_RESPONSE: &str = "<!doctype html><html lang=\"uk\"><head><meta charset=\"utf-8\"><title>MLMaiL</title></head><body><h1>Готово, можете закрити це вікно.</h1></body></html>";
+const HTML_RESPONSE: &str = "<!doctype html><html lang=\"uk\"><head><meta charset=\"utf-8\"><title>MyMail</title></head><body><h1>Готово, можете закрити це вікно.</h1></body></html>";
 
 pub async fn run_login_flow(app: &AppHandle, client_id: &str) -> Result<TokenResponse, AuthError> {
     let pair = pkce::generate();
