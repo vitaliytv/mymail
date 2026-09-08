@@ -70,17 +70,22 @@ fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
 NODE
 
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
-CI=true bun --cwd=app run tauri build --target universal-apple-darwin --bundles dmg
+CI=true bun --cwd=app run tauri build --target universal-apple-darwin --bundles app,dmg
 
 bundle_dir=target/universal-apple-darwin/release/bundle/dmg
 dmg=$(find "$bundle_dir" -maxdepth 1 -type f -name '*.dmg' -print -quit)
 [[ -n $dmg ]] || fail "Tauri did not create a DMG in $bundle_dir"
-[[ -f "$dmg.sig" ]] || fail "Tauri did not create an updater signature for $dmg"
+updater_dir=target/universal-apple-darwin/release/bundle/macos
+updater=$(find "$updater_dir" -maxdepth 1 -type f -name '*.app.tar.gz' -print -quit)
+[[ -n $updater ]] || fail "Tauri did not create an updater archive in $updater_dir"
+[[ -f "$updater.sig" ]] || fail "Tauri did not create an updater signature for $updater"
 
 mkdir -p "$output_dir"
-artifact="MyMail_${version}_universal.dmg"
-cp "$dmg" "$output_dir/$artifact"
-cp "$dmg.sig" "$output_dir/$artifact.sig"
+dmg_artifact="MyMail_${version}_universal.dmg"
+updater_artifact="MyMail_${version}_universal.app.tar.gz"
+cp "$dmg" "$output_dir/$dmg_artifact"
+cp "$updater" "$output_dir/$updater_artifact"
+cp "$updater.sig" "$output_dir/$updater_artifact.sig"
 
 mount_dir=$(mktemp "${TMPDIR:-/tmp}/mymail-dmg.XXXXXX")
 hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_dir" >/dev/null
@@ -95,10 +100,10 @@ mount_dir=
 
 (
   cd "$output_dir"
-  shasum -a 256 "$artifact" "$artifact.sig" > SHA256SUMS
+  shasum -a 256 "$dmg_artifact" "$updater_artifact" "$updater_artifact.sig" > SHA256SUMS
 )
 
-node - "$version" "$artifact" "$output_dir/$artifact.sig" "$output_dir/latest.json" <<'NODE'
+node - "$version" "$updater_artifact" "$output_dir/$updater_artifact.sig" "$output_dir/latest.json" <<'NODE'
 const [version, asset, signaturePath, output] = process.argv.slice(2)
 const fs = require('fs')
 const signature = fs.readFileSync(signaturePath, 'utf8').trim()
@@ -124,7 +129,8 @@ NODE
 
 echo "local release assets: $output_dir"
 echo "upload with:"
-echo "  foc release upload $tag $output_dir/$artifact --repo vitaliytv/mymail"
-echo "  foc release upload $tag $output_dir/$artifact.sig --repo vitaliytv/mymail"
+echo "  foc release upload $tag $output_dir/$dmg_artifact --repo vitaliytv/mymail"
+echo "  foc release upload $tag $output_dir/$updater_artifact --repo vitaliytv/mymail"
+echo "  foc release upload $tag $output_dir/$updater_artifact.sig --repo vitaliytv/mymail"
 echo "  foc release upload $tag $output_dir/SHA256SUMS --repo vitaliytv/mymail"
 echo "  foc release upload $tag $output_dir/latest.json --repo vitaliytv/mymail"
