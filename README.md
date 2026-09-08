@@ -4,7 +4,7 @@
 
 ## Локальний DMG-реліз
 
-Android APK збирає Forgejo. Підписаний macOS ARM64 DMG готується локально на Mac, без GitHub Actions і без збереження signing secrets у репозиторії. Intel Mac не підтримуються у нових desktop releases.
+Android APK і підписаний macOS ARM64 DMG збираються на виділеному Forgejo runner на Mac mini (`release-macos`). Звичайний CI і створення Forgejo release залишаються на ARM64 runner; GitHub Actions для релізу не використовуються. Mac mini отримує secrets лише через Infisical, без збереження signing secrets у репозиторії. Intel Mac не підтримуються у нових desktop releases.
 
 Спочатку створіть локальний Infisical project config для vitaliytv-kfse (це одноразова локальна дія, конфіг не комітиться):
 
@@ -19,7 +19,7 @@ infisical --domain https://secret.7n.ai run --env=main --path=/apple --path=/upd
   cargo xtask release-assets X.Y.Z
 ```
 
-Команда оновлює `app/src-tauri/tauri.conf.json` до `X.Y.Z`, створює локальний version commit і annotated tag `vX.Y.Z`, перевіряє Developer ID signature усередині DMG і створює `dist/MyMail-vX.Y.Z/`: DMG, updater archive, signature, SHA256SUMS і latest.json. Вона не пушить, не створює release і не завантажує файли: після успішної перевірки надруковані команди спершу публікують commit/tag у Forgejo, а потім завантажують assets до release.
+Команду запускають на Mac mini runner. Вона оновлює `app/src-tauri/tauri.conf.json` до `X.Y.Z`, створює локальний version commit і annotated tag `vX.Y.Z`, перевіряє Developer ID signature усередині DMG і створює `dist/MyMail-vX.Y.Z/`: DMG, updater archive, signature, SHA256SUMS і latest.json. Вона не пушить, не створює release і не завантажує файли: після успішної перевірки надруковані команди спершу публікують commit/tag у Forgejo, а потім завантажують assets до release.
 
 Далі, ми додаємо авторизацію на Google і там, і там.
 

@@ -4,6 +4,12 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/), нумерація — [SemVer](https://semver.org/lang/uk/).
 
+## Unreleased
+
+### Changed
+
+- Android release APK тепер виконується на виділеному Forgejo Mac mini runner (`release-macos`); підписаний macOS DMG збирається там само.
+
 ## [0.1.1] - 2026-05-21
 
 ### Added

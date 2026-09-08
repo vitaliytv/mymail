@@ -40,7 +40,9 @@ jobs:
 
   build-android:
     needs: create-release
-    runs-on: release-arm64
+    # Android NDK and the macOS signing toolchain are maintained on the
+    # dedicated Mac mini runner. Keep ordinary CI on release-arm64.
+    runs-on: release-macos
     steps:
       - uses: actions/checkout@v6
         with:
