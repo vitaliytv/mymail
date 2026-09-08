@@ -5,6 +5,8 @@ on:
     tags: ["v*"]
   workflow_dispatch: {}
 
+enable-openid-connect: true
+
 concurrency:
   group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
   cancel-in-progress: true
@@ -39,7 +41,6 @@ jobs:
   build-android:
     needs: create-release
     runs-on: release-arm64
-    enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -67,12 +68,13 @@ jobs:
       - name: Fetch Android secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
-          method: oidc
-          domain: https://secret.7n.ai
-          project-slug: vitaliytv-kfse
-          identity-id: ${{ vars.INFISICAL_FORGEJO_IDENTITY_ID }}
-          env-slug: main
-          secret-path: /mlmail
+          method: "oidc"
+          domain: "https://secret.7n.ai"
+          identity-id: "7fe58b83-70e0-4dba-9054-b0ab0a3697ef"
+          oidc-audience: "git.7n.ai/vitaliytv/mymail"
+          project-slug: "git-7n-ai-runners"
+          env-slug: "prod"
+          secret-path: "/mymail"
       - name: Configure release signing
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore.jks"
