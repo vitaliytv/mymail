@@ -47,16 +47,10 @@ output_dir="dist/MyMail-v$version"
 [[ ! -e $output_dir ]] || fail "refusing to overwrite $output_dir"
 
 backup=$(mktemp "${TMPDIR:-/tmp}/mymail-tauri-conf.XXXXXX")
-mount_dir=
-mounted=0
 
 cleanup() {
   cp "$backup" "$config"
   rm -f "$backup"
-  if [[ $mounted == 1 ]]; then
-    hdiutil detach "$mount_dir" -quiet || true
-  fi
-  [[ -z $mount_dir ]] || rmdir "$mount_dir" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -87,16 +81,8 @@ cp "$dmg" "$output_dir/$dmg_artifact"
 cp "$updater" "$output_dir/$updater_artifact"
 cp "$updater.sig" "$output_dir/$updater_artifact.sig"
 
-mount_dir=$(mktemp "${TMPDIR:-/tmp}/mymail-dmg.XXXXXX")
-hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_dir" >/dev/null
-mounted=1
-app_bundle=$(find "$mount_dir" -maxdepth 2 -type d -name '*.app' -print -quit)
-[[ -n $app_bundle ]] || fail "DMG does not contain an application bundle"
-codesign --verify --deep --strict --verbose=2 "$app_bundle"
-hdiutil detach "$mount_dir" -quiet
-mounted=0
-rmdir "$mount_dir"
-mount_dir=
+codesign --verify --deep --strict --verbose=2 "$updater_dir/MyMail.app"
+hdiutil verify "$dmg"
 
 (
   cd "$output_dir"
