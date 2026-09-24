@@ -42,19 +42,13 @@ for variable in \
   [[ -n ${!variable:-} ]] || fail "missing $variable; run through Infisical"
 done
 
-config=app/src-tauri/tauri.conf.json
+manifest=app/package.json
 output_dir="dist/MyMail-v$version"
 [[ ! -e $output_dir ]] || fail "refusing to overwrite $output_dir"
 
-config_version=$(node - "$config" <<'NODE'
-const [file] = process.argv.slice(2)
-const fs = require('fs')
-const config = JSON.parse(fs.readFileSync(file, 'utf8'))
-process.stdout.write(config.version)
-NODE
-)
-[[ $config_version == "$version" ]] ||
-  fail "app/src-tauri/tauri.conf.json has version $config_version; xtask must prepare $version first"
+manifest_version=$(node -p "require('./$manifest').version")
+[[ $manifest_version == "$version" ]] ||
+  fail "$manifest has version $manifest_version; build from the merged release tag $tag"
 
 rustup target add aarch64-apple-darwin
 CI=true bun --cwd=app run tauri build --target aarch64-apple-darwin --bundles app,dmg
@@ -105,12 +99,4 @@ fs.writeFileSync(
 )
 NODE
 
-echo "local release assets: $output_dir"
-echo "publish the verified version commit and tag with:"
-echo "  git push origin HEAD $tag"
-echo "upload with:"
-echo "  foc release upload $tag $output_dir/$dmg_artifact --repo vitaliytv/mymail"
-echo "  foc release upload $tag $output_dir/$updater_artifact --repo vitaliytv/mymail"
-echo "  foc release upload $tag $output_dir/$updater_artifact.sig --repo vitaliytv/mymail"
-echo "  foc release upload $tag $output_dir/SHA256SUMS --repo vitaliytv/mymail"
-echo "  foc release upload $tag $output_dir/latest.json --repo vitaliytv/mymail"
+echo "release assets: $output_dir"

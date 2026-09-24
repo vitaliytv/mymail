@@ -850,7 +850,7 @@ pub async fn plugin_draft_helper_create(
     let generation =
         ActivationGeneration::new(selection.generation).map_err(|error| error.to_string())?;
     let lock_path = ensure_gmail_wkg_lock(&app_data).map_err(|error| error.to_string())?;
-    let runtime = build_gmail_plugin_runtime(&lock_path, env!("CARGO_PKG_VERSION"))
+    let runtime = build_gmail_plugin_runtime(&lock_path, &app.package_info().version.to_string())
         .await
         .map_err(|error| error.to_string())?;
     let context = PluginContextCoordinator::start(plugin_context::context_database(&app_data))
@@ -918,7 +918,7 @@ pub async fn plugin_booking_finder_find(
     let generation =
         ActivationGeneration::new(selection.generation).map_err(|error| error.to_string())?;
     let lock_path = ensure_gmail_wkg_lock(&app_data).map_err(|error| error.to_string())?;
-    let runtime = build_gmail_plugin_runtime(&lock_path, env!("CARGO_PKG_VERSION"))
+    let runtime = build_gmail_plugin_runtime(&lock_path, &app.package_info().version.to_string())
         .await
         .map_err(|error| error.to_string())?;
     let context = PluginContextCoordinator::start(plugin_context::context_database(&app_data))

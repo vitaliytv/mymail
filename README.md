@@ -2,24 +2,33 @@
 
 додаток у нас наразі працює в двох режимах: Android та для Mac OS.
 
-## Локальний DMG-реліз
+## Реліз
 
-Android APK і підписаний macOS ARM64 DMG збираються на виділеному Forgejo runner на Mac mini (`release-macos`). Звичайний CI і створення Forgejo release залишаються на ARM64 runner; GitHub Actions для релізу не використовуються. Mac mini отримує secrets лише через Infisical, без збереження signing secrets у репозиторії. Intel Mac не підтримуються у нових desktop releases.
+Реліз працює за моделлю `foc`; workflow — `.forgejo/workflows/release.yml`. Єдине джерело версії — `app/package.json`: `tauri.conf.json` читає її через `"version": "../package.json"`.
 
-Спочатку створіть локальний Infisical project config для vitaliytv-kfse (це одноразова локальна дія, конфіг не комітиться):
+1. Кожна зміна `app/` супроводжується change-файлом у `app/.changes/` (`npx @7n/n ch`).
+2. Після merge у `main` job `prepare-release-pr` запускає `n-rules release`, який бампає `app/package.json` і дописує `app/CHANGELOG.md`, і відкриває PR `release/vX.Y.Z` з комітом `chore(release): vX.Y.Z`. Автоматизація ніколи не пушить у `main` напряму.
+3. Merge release PR → `tag-release` ставить annotated tag `vX.Y.Z` і запускає `release.yml` на тезі.
+4. На тезі: `validate` → draft release → паралельні збірки на Mac mini (`release-macos`): підписаний ARM64 DMG, updater archive, `latest.json`, Android APK → collector (`SHA256SUMS`, `MANIFEST.txt`, upload) → публікація релізу. Updater бачить нову версію лише після публікації.
+
+Forgejo-токени видаються через OIDC Authorized Integrations репозиторію (preparation і publication), signing secrets — через Infisical. GitHub Actions для релізу не використовуються. Intel Mac не підтримуються у нових desktop releases.
+
+### Локальна перевірка assets
+
+Для діагностики ті самі assets можна зібрати локально з checkout злитого release-тегу. Спочатку створіть локальний Infisical project config (одноразово, не комітиться):
 
 ```sh
 infisical --domain https://secret.7n.ai init
 ```
 
-Після того як тег vX.Y.Z вказує на поточний чистий HEAD, зберіть assets:
+Потім на чистому checkout тегу `vX.Y.Z`:
 
 ```sh
 infisical --domain https://secret.7n.ai run --env=main --path=/apple --path=/updater -- \
   cargo xtask release-assets X.Y.Z
 ```
 
-Команду запускають на Mac mini runner. Вона оновлює `app/src-tauri/tauri.conf.json` до `X.Y.Z`, створює локальний version commit і annotated tag `vX.Y.Z`, перевіряє Developer ID signature усередині DMG і створює `dist/MyMail-vX.Y.Z/`: DMG, updater archive, signature, SHA256SUMS і latest.json. Вона не пушить, не створює release і не завантажує файли: після успішної перевірки надруковані команди спершу публікують commit/tag у Forgejo, а потім завантажують assets до release.
+Команда перевіряє, що `app/package.json` має версію `X.Y.Z` і тег вказує на HEAD, і створює `dist/MyMail-vX.Y.Z/`: DMG, updater archive, signature, SHA256SUMS і latest.json. Вона нічого не комітить, не тегує і не змінює стан на сервері.
 
 Далі, ми додаємо авторизацію на Google і там, і там.
 
