@@ -2,47 +2,197 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch: {}
 
-enable-openid-connect: true
+env:
+  FORGEJO_URL: https://git.7n.ai
+  RELEASE_REPOSITORY: vitaliytv/mymail
+  # Forgejo OIDC Authorized Integration of vitaliytv/mymail limited to release.yml.
+  # One integration serves both preparation (main) and publication (v* tags).
+  RELEASE_AUDIENCE: u:3:43ba5066-a51c-4458-b3fa-3973d021a9f4
 
 concurrency:
-  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  # A main push may supersede an older preparation run, but must never cancel a tag release.
+  group: mymail-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  create-release:
+  prepare-release-pr:
+    # Never push a release commit to protected main. Prepare it in a PR instead.
+    if: "${{ github.ref_type == 'branch' && github.ref_name == 'main' && !contains(github.event.head_commit.message, 'chore(release): v') }}"
     runs-on: release-arm64
-    outputs:
-      release_id: ${{ steps.release.outputs.release_id }}
+    enable-openid-connect: true
     steps:
-      - name: Create or reuse Forgejo release
-        id: release
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-bun-deps
+      - id: release-version
+        name: Bump version from change files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          # Keep the n-rules release commit and tags local; the release PR carries the change.
+          N_RULES_RELEASE_PUSH: "0"
         run: |
-          node <<'NODE'
-          (async () => {
-            const tag = process.env.GITHUB_REF_NAME;
-            const api = `${process.env.FORGEJO_API_URL}/repos/${process.env.FORGEJO_REPOSITORY}`;
-            const headers = { Authorization: `token ${process.env.FORGEJO_TOKEN}`, 'Content-Type': 'application/json' };
-            let response = await fetch(`${api}/releases/tags/${encodeURIComponent(tag)}`, { headers });
-            if (response.status === 404) {
-              response = await fetch(`${api}/releases`, {
-                method: 'POST', headers,
-                body: JSON.stringify({ tag_name: tag, name: `MyMail ${tag}`, draft: false, prerelease: false }),
-              });
-            }
-            if (!response.ok) throw new Error(`release request failed: ${response.status}`);
-            const release = await response.json();
-            require('fs').appendFileSync(process.env.GITHUB_OUTPUT, `release_id=${release.id}\n`);
-          })().catch((error) => { console.error(error); process.exit(1); });
-          NODE
+          set -eu
+          if [ "${EVENT_NAME}" = push ] && ! find app/.changes -name '*.md' | grep -q .; then
+            echo "No app change files; nothing to release."
+            printf 'release=false\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          git config user.name "forgejo-actions[bot]"
+          git config user.email "forgejo-actions[bot]@users.noreply.git.7n.ai"
+          before="$(git rev-parse HEAD)"
+          bunx n-rules release
+          if [ "$(git rev-parse HEAD)" = "${before}" ]; then
+            printf 'release=false\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          # Unwrap the local n-rules commit: its changes stay staged for the release PR.
+          for tag in $(git tag --points-at HEAD); do git tag -d "${tag}"; done
+          git reset --soft "${before}"
+          # The monorepo root is not a release workspace; tool bookkeeping there is not part of a release.
+          git restore --staged --worktree -- package.json bun.lock
+          current="$(git show "${before}:app/package.json" | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')"
+          version="$(node -p "require('./app/package.json').version")"
+          if [ "${version}" = "${current}" ]; then
+            echo "app version is unchanged; nothing to release."
+            printf 'release=false\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          if git rev-parse --verify --quiet "refs/tags/v${version}" >/dev/null; then
+            echo "Tag v${version} already exists; add a change file with a larger bump." >&2
+            exit 1
+          fi
+          git diff --cached --name-status
+          {
+            printf 'release=true\nversion=%s\ntag=v%s\n' "${version}" "${version}"
+            printf 'paths<<PATHS\n'
+            git diff --cached --name-only
+            printf 'PATHS\n'
+          } >> "${GITHUB_OUTPUT}"
+      - if: steps.release-version.outputs.release == 'true'
+        id: oidc
+        uses: nitra/actions/oidc-token@v1
+        with:
+          audience: ${{ env.RELEASE_AUDIENCE }}
+      - if: steps.release-version.outputs.release == 'true'
+        uses: nitra/actions/forgejo-create-release-pr@v1
+        with:
+          token: ${{ steps.oidc.outputs.token }}
+          server-url: ${{ env.FORGEJO_URL }}
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          tag: ${{ steps.release-version.outputs.tag }}
+          paths: ${{ steps.release-version.outputs.paths }}
+          base: main
+          commit-message: "chore(release): ${{ steps.release-version.outputs.tag }}"
+
+  tag-release:
+    # A merged release PR has the version commit on protected main; only the tag is pushed.
+    if: "${{ github.ref_type == 'branch' && github.ref_name == 'main' && contains(github.event.head_commit.message, 'chore(release): v') }}"
+    runs-on: release-arm64
+    enable-openid-connect: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: oidc
+        uses: nitra/actions/oidc-token@v1
+        with:
+          audience: ${{ env.RELEASE_AUDIENCE }}
+      - id: tag
+        run: |
+          set -eu
+          printf 'value=v%s\n' "$(node -p "require('./app/package.json').version")" >> "${GITHUB_OUTPUT}"
+      - uses: nitra/actions/forgejo-tag-and-dispatch@v1
+        with:
+          token: ${{ steps.oidc.outputs.token }}
+          server-url: ${{ env.FORGEJO_URL }}
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          tag: ${{ steps.tag.outputs.value }}
+          workflow: release.yml
+          expected-commit-message: "chore(release): ${{ steps.tag.outputs.value }}"
+
+  validate:
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+    runs-on: release-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate release tag and version source
+        run: |
+          set -eu
+          # Full lint and test coverage is required from CI before merge.
+          test "${GITHUB_REF_NAME}" = "v$(node -p "require('./app/package.json').version")"
+          test "$(node -p "require('./app/src-tauri/tauri.conf.json').version")" = "../package.json"
+
+  create-release:
+    needs: validate
+    runs-on: release-arm64
+    enable-openid-connect: true
+    outputs:
+      id: ${{ steps.release.outputs.release-id }}
+    steps:
+      - id: oidc
+        uses: nitra/actions/oidc-token@v1
+        with:
+          audience: ${{ env.RELEASE_AUDIENCE }}
+      - id: release
+        uses: nitra/actions/forgejo-create-draft-release@v1
+        with:
+          token: ${{ steps.oidc.outputs.token }}
+          server-url: ${{ env.FORGEJO_URL }}
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          tag: ${{ github.ref_name }}
+          name: MyMail ${{ github.ref_name }}
+
+  build-macos-arm64:
+    needs: create-release
+    # The macOS signing toolchain is maintained on the dedicated Mac mini runner.
+    runs-on: release-macos
+    enable-openid-connect: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun-deps
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+      - name: Fetch macOS signing secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: "oidc"
+          domain: "https://secret.7n.ai"
+          identity-id: "7fe58b83-70e0-4dba-9054-b0ab0a3697ef"
+          oidc-audience: "git.7n.ai/vitaliytv/mymail"
+          project-slug: "git-7n-ai-runners"
+          env-slug: "prod"
+          secret-path: "/mymail"
+      - name: Build signed DMG and updater archive
+        run: bun --cwd=app run release:dmg "${GITHUB_REF_NAME#v}"
+      - name: Stage macOS assets
+        run: |
+          set -eu
+          mkdir -p release-assets
+          src="dist/MyMail-${GITHUB_REF_NAME}"
+          # The collector owns the release SHA256SUMS and MANIFEST.txt.
+          find "${src}" -maxdepth 1 -type f ! -name SHA256SUMS -exec cp {} release-assets/ \;
+      - uses: actions/upload-artifact@v3
+        with:
+          name: release-macos-arm64
+          path: release-assets
 
   build-android:
     needs: create-release
-    # Android NDK and the macOS signing toolchain are maintained on the
-    # dedicated Mac mini runner. Keep ordinary CI on release-arm64.
+    # Android NDK is maintained on the dedicated Mac mini runner.
     runs-on: release-macos
+    enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6
         with:
@@ -69,10 +219,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
-      - name: Sync app version from tag
-        run: |
-          VER="${GITHUB_REF_NAME#v}"
-          node -e "const fs=require('fs');const f='app/src-tauri/tauri.conf.json';const c=JSON.parse(fs.readFileSync(f));c.version=process.argv[1];fs.writeFileSync(f,JSON.stringify(c,null,2)+'\\n')" "$VER"
       - name: Fetch Android secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -96,13 +242,74 @@ jobs:
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: bun --cwd=app run tauri android build --apk
-      - name: Upload APK to Forgejo release
-        env:
-          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+      - name: Stage Android asset
         run: |
-          VER="${GITHUB_REF_NAME#v}"
-          SRC=$(find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name '*.apk' | head -1)
-          curl --fail --silent --show-error \
-            --header "Authorization: token ${FORGEJO_TOKEN}" \
-            --form "attachment=@${SRC};filename=mlmail_${VER}_universal.apk" \
-            "${FORGEJO_API_URL}/repos/${FORGEJO_REPOSITORY}/releases/${RELEASE_ID}/assets?name=mlmail_${VER}_universal.apk"
+          set -eu
+          mkdir -p release-assets
+          src=$(find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name '*.apk' | head -1)
+          test -n "${src}"
+          cp "${src}" "release-assets/MyMail_${GITHUB_REF_NAME#v}_universal.apk"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: release-android
+          path: release-assets
+
+  collect-and-publish:
+    needs: [create-release, build-macos-arm64, build-android]
+    runs-on: release-arm64
+    enable-openid-connect: true
+    steps:
+      - uses: actions/download-artifact@v3
+        with: { pattern: release-*, path: release-assets, merge-multiple: true }
+      - name: Flatten Forgejo v3 artifact layout
+        run: find release-assets -mindepth 2 -type f -exec mv {} release-assets/ \;
+      - id: files
+        name: List release assets
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          {
+            printf 'assets<<ASSETS\n'
+            printf 'release-assets/MyMail_%s_arm64.dmg\n' "${version}"
+            printf 'release-assets/MyMail_%s_arm64.app.tar.gz\n' "${version}"
+            printf 'release-assets/MyMail_%s_arm64.app.tar.gz.sig\n' "${version}"
+            printf 'release-assets/MyMail_%s_universal.apk\n' "${version}"
+            printf 'release-assets/latest.json\n'
+            printf 'ASSETS\n'
+          } >> "${GITHUB_OUTPUT}"
+      - uses: nitra/actions/release-manifest@v1
+        with:
+          output-directory: release-assets
+          title: MyMail ${{ github.ref_name }}
+          files: ${{ steps.files.outputs.assets }}
+      - id: oidc
+        uses: nitra/actions/oidc-token@v1
+        with:
+          audience: ${{ env.RELEASE_AUDIENCE }}
+      - uses: nitra/actions/forgejo-upload-release-assets@v1
+        with:
+          token: ${{ steps.oidc.outputs.token }}
+          server-url: ${{ env.FORGEJO_URL }}
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          release-id: ${{ needs.create-release.outputs.id }}
+          files: |
+            ${{ steps.files.outputs.assets }}
+            release-assets/SHA256SUMS
+            release-assets/MANIFEST.txt
+
+  publish-release:
+    # The updater follows releases/latest, so the release becomes public only after every asset is uploaded.
+    needs: collect-and-publish
+    runs-on: release-arm64
+    enable-openid-connect: true
+    steps:
+      - id: oidc
+        uses: nitra/actions/oidc-token@v1
+        with:
+          audience: ${{ env.RELEASE_AUDIENCE }}
+      - uses: nitra/actions/forgejo-publish-release@v1
+        with:
+          token: ${{ steps.oidc.outputs.token }}
+          server-url: ${{ env.FORGEJO_URL }}
+          repository: ${{ env.RELEASE_REPOSITORY }}
+          tag: ${{ github.ref_name }}

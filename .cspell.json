@@ -358,7 +358,18 @@
     "читаємий",
     "чорнетку",
     "юніт",
-    "Юніт"
+    "Юніт",
+    "forgejo",
+    "temurin",
+    "sdkmanager",
+    "cmdline",
+    "nttld",
+    "armv",
+    "androideabi",
+    "codesign",
+    "xtask",
+    "mymail",
+    "codesigning"
   ],
   "useGitignore": true,
   "gitignoreRoot": "."
