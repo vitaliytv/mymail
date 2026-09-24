@@ -8,11 +8,9 @@ on:
 env:
   FORGEJO_URL: https://git.7n.ai
   RELEASE_REPOSITORY: vitaliytv/mymail
-  # Forgejo OIDC Authorized Integrations of vitaliytv/mymail (foc model):
-  # preparation permits push and workflow_dispatch of release.yml;
-  # publication is limited to v* tag runs of release.yml.
-  PREPARE_AUDIENCE: "TODO: u:<id>:<uuid> of the mymail release preparation integration"
-  PUBLISH_AUDIENCE: "TODO: u:<id>:<uuid> of the mymail release publication integration"
+  # Forgejo OIDC Authorized Integration of vitaliytv/mymail limited to release.yml.
+  # One integration serves both preparation (main) and publication (v* tags).
+  RELEASE_AUDIENCE: "TODO: u:<id>:<uuid> of the mymail release integration"
 
 concurrency:
   # A main push may supersede an older preparation run, but must never cancel a tag release.
@@ -78,7 +76,7 @@ jobs:
         id: oidc
         uses: nitra/actions/oidc-token@v1
         with:
-          audience: ${{ env.PREPARE_AUDIENCE }}
+          audience: ${{ env.RELEASE_AUDIENCE }}
       - if: steps.release-version.outputs.release == 'true'
         uses: nitra/actions/forgejo-create-release-pr@v1
         with:
@@ -102,7 +100,7 @@ jobs:
       - id: oidc
         uses: nitra/actions/oidc-token@v1
         with:
-          audience: ${{ env.PREPARE_AUDIENCE }}
+          audience: ${{ env.RELEASE_AUDIENCE }}
       - id: tag
         run: |
           set -eu
@@ -140,7 +138,7 @@ jobs:
       - id: oidc
         uses: nitra/actions/oidc-token@v1
         with:
-          audience: ${{ env.PUBLISH_AUDIENCE }}
+          audience: ${{ env.RELEASE_AUDIENCE }}
       - id: release
         uses: nitra/actions/forgejo-create-draft-release@v1
         with:
@@ -287,7 +285,7 @@ jobs:
       - id: oidc
         uses: nitra/actions/oidc-token@v1
         with:
-          audience: ${{ env.PUBLISH_AUDIENCE }}
+          audience: ${{ env.RELEASE_AUDIENCE }}
       - uses: nitra/actions/forgejo-upload-release-assets@v1
         with:
           token: ${{ steps.oidc.outputs.token }}
@@ -308,7 +306,7 @@ jobs:
       - id: oidc
         uses: nitra/actions/oidc-token@v1
         with:
-          audience: ${{ env.PUBLISH_AUDIENCE }}
+          audience: ${{ env.RELEASE_AUDIENCE }}
       - uses: nitra/actions/forgejo-publish-release@v1
         with:
           token: ${{ steps.oidc.outputs.token }}
