@@ -27,13 +27,15 @@ fi
 [[ $(git rev-parse "$tag^{commit}") == $(git rev-parse HEAD) ]] ||
   fail "$tag must point at HEAD"
 
-for command in bun codesign hdiutil shasum node rustup; do
+for command in bun codesign security hdiutil shasum node rustup; do
   command -v "$command" >/dev/null || fail "missing required command: $command"
 done
 
+# Sign with the Developer ID identity installed in the runner keychain, as foc does;
+# a certificate from the environment would make Tauri import it into a temporary keychain.
+unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
+
 for variable in \
-  APPLE_CERTIFICATE \
-  APPLE_CERTIFICATE_PASSWORD \
   APPLE_SIGNING_IDENTITY \
   APPLE_ID \
   APPLE_PASSWORD \
@@ -41,6 +43,9 @@ for variable in \
   TAURI_SIGNING_PRIVATE_KEY; do
   [[ -n ${!variable:-} ]] || fail "missing $variable; run through Infisical"
 done
+
+security find-identity -v -p codesigning | grep -Fq "\"$APPLE_SIGNING_IDENTITY\"" ||
+  fail "signing identity $APPLE_SIGNING_IDENTITY is not installed in the keychain"
 
 manifest=app/package.json
 output_dir="dist/MyMail-v$version"

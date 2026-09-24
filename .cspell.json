@@ -368,7 +368,8 @@
     "androideabi",
     "codesign",
     "xtask",
-    "mymail"
+    "mymail",
+    "codesigning"
   ],
   "useGitignore": true,
   "gitignoreRoot": "."
