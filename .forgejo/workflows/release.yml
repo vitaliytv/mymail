@@ -10,7 +10,7 @@ env:
   RELEASE_REPOSITORY: vitaliytv/mymail
   # Forgejo OIDC Authorized Integration of vitaliytv/mymail limited to release.yml.
   # One integration serves both preparation (main) and publication (v* tags).
-  RELEASE_AUDIENCE: "TODO: u:<id>:<uuid> of the mymail release integration"
+  RELEASE_AUDIENCE: u:3:43ba5066-a51c-4458-b3fa-3973d021a9f4
 
 concurrency:
   # A main push may supersede an older preparation run, but must never cancel a tag release.
