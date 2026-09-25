@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.1] - 2026-09-25
+
+### Fixed
+
+- Збірки macOS DMG і Android APK запускаються на наявному Mac mini runner `macos-arm64` (як у foc) замість неіснуючої мітки `release-macos`, через яку реліз v0.31.0 не зібрався.
+
 ## [0.31.0] - 2026-09-25
 
 ### Changed
