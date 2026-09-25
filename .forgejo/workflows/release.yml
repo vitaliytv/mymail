@@ -156,8 +156,8 @@ jobs:
 
   build-macos-arm64:
     needs: create-release
-    # The macOS signing toolchain is maintained on the dedicated Mac mini runner.
-    runs-on: release-macos
+    # The Mac mini runner shared with foc holds the Developer ID keychain identity.
+    runs-on: macos-arm64
     enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6
@@ -196,8 +196,8 @@ jobs:
 
   build-android:
     needs: create-release
-    # Android NDK is maintained on the dedicated Mac mini runner.
-    runs-on: release-macos
+    # Android SDK is maintained on the Mac mini runner.
+    runs-on: macos-arm64
     enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6

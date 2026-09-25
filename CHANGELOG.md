@@ -8,7 +8,7 @@
 
 ### Changed
 
-- Android release APK тепер виконується на виділеному Forgejo Mac mini runner (`release-macos`); підписаний macOS DMG збирається там само.
+- Android release APK тепер виконується на Forgejo Mac mini runner (`macos-arm64`, спільний з `foc`); підписаний macOS DMG збирається там само.
 
 ## [0.1.1] - 2026-05-21
 

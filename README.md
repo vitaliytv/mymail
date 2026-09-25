@@ -9,7 +9,7 @@
 1. Кожна зміна `app/` супроводжується change-файлом у `app/.changes/` (`npx @7n/n ch`).
 2. Після merge у `main` job `prepare-release-pr` запускає `n-rules release`, який бампає `app/package.json` і дописує `app/CHANGELOG.md`, і відкриває PR `release/vX.Y.Z` з комітом `chore(release): vX.Y.Z`. Автоматизація ніколи не пушить у `main` напряму.
 3. Merge release PR → `tag-release` ставить annotated tag `vX.Y.Z` і запускає `release.yml` на тезі.
-4. На тезі: `validate` → draft release → паралельні збірки на Mac mini (`release-macos`): підписаний ARM64 DMG, updater archive, `latest.json`, Android APK → collector (`SHA256SUMS`, `MANIFEST.txt`, upload) → публікація релізу. Updater бачить нову версію лише після публікації.
+4. На тезі: `validate` → draft release → паралельні збірки на Mac mini (`macos-arm64`, спільний з `foc`): підписаний ARM64 DMG, updater archive, `latest.json`, Android APK → collector (`SHA256SUMS`, `MANIFEST.txt`, upload) → публікація релізу. Updater бачить нову версію лише після публікації.
 
 Forgejo-токени видаються через одну OIDC Authorized Integration репозиторію, обмежену `release.yml` (`RELEASE_AUDIENCE`). Як у `foc`, DMG підписується Developer ID-сертифікатом, установленим у keychain Mac mini (`APPLE_SIGNING_IDENTITY` — його назва); Infisical постачає лише облікові дані нотаризації (`APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`) і ключ updater (`TAURI_SIGNING_PRIVATE_KEY`). GitHub Actions для релізу не використовуються. Intel Mac не підтримуються у нових desktop releases.
 
