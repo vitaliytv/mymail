@@ -107,6 +107,9 @@ jobs:
       - id: tag
         run: |
           set -eu
+          # forgejo-tag-and-dispatch creates an annotated tag, which needs a committer identity.
+          git config user.name "forgejo-actions[bot]"
+          git config user.email "forgejo-actions[bot]@users.noreply.git.7n.ai"
           printf 'value=v%s\n' "$(node -p "require('./app/package.json').version")" >> "${GITHUB_OUTPUT}"
       - uses: nitra/actions/forgejo-tag-and-dispatch@v1
         with:
