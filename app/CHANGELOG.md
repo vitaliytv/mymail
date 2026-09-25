@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.31.0] - 2026-09-25
+
+### Changed
+
+- DMG-реліз MyMail готується локально з Infisical signing secrets і публікується у Forgejo замість GitHub Actions.
+- Локальний macOS реліз тепер створює лише ARM64 assets з оптимізованим Cargo release profile.
+- Локальні macOS release assets тепер запускаються через `cargo xtask release-assets`.
+- `cargo xtask release-assets` тепер зберігає версію релізу в source commit і тегу, а publisher не переписує Tauri config.
+- Реліз переведено на модель foc: release PR із bump версії, тег після мержу, draft-реліз, збірка macOS DMG і Android APK у CI та публікація після завантаження всіх assets. Єдине джерело версії — `app/package.json`; плагіни отримують справжню версію застосунку.
+
+### Fixed
+
+- Локальна universal DMG-збірка самостійно встановлює обидва macOS Rust targets.
+- Локальна DMG-збірка не запускає Finder-оформлення, яке не працює в non-interactive процесі.
+- Локальний DMG-реліз додає підписаний macOS updater archive і Forgejo latest.json.
+- Локальний DMG pipeline перевіряє цілісність образу без нестабільного монтування.
+- Android release на Forgejo ARM64 використовує вже встановлений Android SDK замість застарілого пакета `tools`.
+
 ## [0.30.1] - 2026-08-20
 
 ### Changed
