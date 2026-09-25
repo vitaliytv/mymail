@@ -69,7 +69,10 @@ jobs:
           {
             printf 'release=true\nversion=%s\ntag=v%s\n' "${version}" "${version}"
             printf 'paths<<PATHS\n'
-            git diff --cached --name-only
+            # The release PR action runs `git add` per path, which rejects a removed file;
+            # pass the directory of each consumed change file instead (it keeps .gitkeep).
+            git diff --cached --name-only --diff-filter=d
+            git diff --cached --name-only --diff-filter=D | while IFS= read -r removed; do dirname "${removed}"; done | sort -u
             printf 'PATHS\n'
           } >> "${GITHUB_OUTPUT}"
       - if: steps.release-version.outputs.release == 'true'
