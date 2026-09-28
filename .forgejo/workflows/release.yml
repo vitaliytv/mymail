@@ -181,17 +181,59 @@ jobs:
           env-slug: "prod"
           secret-path: "/mymail"
       - name: Build signed DMG and updater archive
-        run: bun --cwd=app run release:dmg "${GITHUB_REF_NAME#v}"
+        run: bun --cwd=app run release:dmg "${GITHUB_REF_NAME#v}" arm64
       - name: Stage macOS assets
         run: |
           set -eu
           mkdir -p release-assets
-          src="dist/MyMail-${GITHUB_REF_NAME}"
-          # The collector owns the release SHA256SUMS and MANIFEST.txt.
-          find "${src}" -maxdepth 1 -type f ! -name SHA256SUMS -exec cp {} release-assets/ \;
+          src="dist/MyMail-${GITHUB_REF_NAME}-arm64"
+          # The collector owns the release SHA256SUMS, MANIFEST.txt and the merged latest.json.
+          find "${src}" -maxdepth 1 -type f ! -name SHA256SUMS ! -name latest.json -exec cp {} release-assets/ \;
+          cp "${src}/latest.json" release-assets/latest-arm64.json
       - uses: actions/upload-artifact@v3
         with:
           name: release-macos-arm64
+          path: release-assets
+
+  build-macos-x86_64:
+    needs: create-release
+    # The Intel Mac runner shared with foc builds the native x86_64 DMG; it needs the same Developer ID keychain identity.
+    runs-on: macos-x86_64
+    enable-openid-connect: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun-deps
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+      - name: Fetch macOS signing secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.16
+        with:
+          method: "oidc"
+          domain: "https://secret.7n.ai"
+          identity-id: "7fe58b83-70e0-4dba-9054-b0ab0a3697ef"
+          oidc-audience: "git.7n.ai/vitaliytv/mymail"
+          project-slug: "git-7n-ai-runners"
+          env-slug: "prod"
+          secret-path: "/mymail"
+      - name: Build signed DMG and updater archive
+        run: bun --cwd=app run release:dmg "${GITHUB_REF_NAME#v}" x64
+      - name: Stage macOS assets
+        run: |
+          set -eu
+          mkdir -p release-assets
+          src="dist/MyMail-${GITHUB_REF_NAME}-x64"
+          # The collector owns the release SHA256SUMS, MANIFEST.txt and the merged latest.json.
+          find "${src}" -maxdepth 1 -type f ! -name SHA256SUMS ! -name latest.json -exec cp {} release-assets/ \;
+          cp "${src}/latest.json" release-assets/latest-x64.json
+      - uses: actions/upload-artifact@v3
+        with:
+          name: release-macos-x86_64
           path: release-assets
 
   build-android:
@@ -261,7 +303,7 @@ jobs:
           path: release-assets
 
   collect-and-publish:
-    needs: [create-release, build-macos-arm64, build-android]
+    needs: [create-release, build-macos-arm64, build-macos-x86_64, build-android]
     runs-on: release-arm64
     enable-openid-connect: true
     steps:
@@ -269,6 +311,20 @@ jobs:
         with: { pattern: release-*, path: release-assets, merge-multiple: true }
       - name: Flatten Forgejo v3 artifact layout
         run: find release-assets -mindepth 2 -type f -exec mv {} release-assets/ \;
+      - name: Merge updater manifests
+        run: |
+          set -eu
+          # Each macOS build emits latest.json for its own architecture; the updater needs both platforms.
+          node - release-assets/latest-arm64.json release-assets/latest-x64.json > release-assets/latest.json <<'NODE'
+          const fs = require('fs')
+          const [first, ...rest] = process.argv.slice(2).map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))
+          for (const manifest of rest) {
+            if (manifest.version !== first.version) throw new Error(`version mismatch: ${manifest.version} != ${first.version}`)
+            Object.assign(first.platforms, manifest.platforms)
+          }
+          process.stdout.write(JSON.stringify(first, null, 2) + '\n')
+          NODE
+          rm release-assets/latest-arm64.json release-assets/latest-x64.json
       - id: files
         name: List release assets
         run: |
@@ -279,6 +335,9 @@ jobs:
             printf 'release-assets/MyMail_%s_arm64.dmg\n' "${version}"
             printf 'release-assets/MyMail_%s_arm64.app.tar.gz\n' "${version}"
             printf 'release-assets/MyMail_%s_arm64.app.tar.gz.sig\n' "${version}"
+            printf 'release-assets/MyMail_%s_x64.dmg\n' "${version}"
+            printf 'release-assets/MyMail_%s_x64.app.tar.gz\n' "${version}"
+            printf 'release-assets/MyMail_%s_x64.app.tar.gz.sig\n' "${version}"
             printf 'release-assets/MyMail_%s_universal.apk\n' "${version}"
             printf 'release-assets/latest.json\n'
             printf 'ASSETS\n'
