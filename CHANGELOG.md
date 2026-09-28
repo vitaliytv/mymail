@@ -8,7 +8,6 @@
 
 ### Changed
 
-- Реліз додатково збирає підписаний Intel macOS DMG на Forgejo runner `macos-x86_64` (як у `foc`); `latest.json` містить updater-платформи `darwin-aarch64` і `darwin-x86_64`.
 - Android release APK тепер виконується на Forgejo Mac mini runner (`macos-arm64`, спільний з `foc`); підписаний macOS DMG збирається там само.
 
 ## [0.1.1] - 2026-05-21
