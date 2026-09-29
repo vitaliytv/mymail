@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.2] - 2026-09-29
+
+### Fixed
+
+- Збірки релізу більше не клонують `internal`-репозиторій `nitra/n-plugin`: crate-и `n-plugin-*` 0.2.1 беруться з реєстру `crates-7n`, як у foc, а Wasmtime — стабільний `48.0.3` з crates.io (з security-фіксами v48). macOS-збірка отримує назву Developer ID-сертифіката з workflow, як у foc, тому більше не падає з `missing APPLE_SIGNING_IDENTITY`.
+
 ## [0.31.1] - 2026-09-25
 
 ### Fixed
