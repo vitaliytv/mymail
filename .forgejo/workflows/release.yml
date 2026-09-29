@@ -181,6 +181,10 @@ jobs:
           env-slug: "prod"
           secret-path: "/mymail"
       - name: Build signed DMG and updater archive
+        env:
+          # Name of the Developer ID identity in the runner keychain, as foc passes it; not a secret.
+          # cspell:disable-next-line
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: N.itra ou (UHG6A28MTA)"
         run: bun --cwd=app run release:dmg "${GITHUB_REF_NAME#v}"
       - name: Stage macOS assets
         run: |

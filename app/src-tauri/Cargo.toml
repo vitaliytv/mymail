@@ -39,13 +39,13 @@ html-escape = "0.2"
 encoding_rs = "0.8"
 tauri-plugin-mcp-bridge = "0.11.2"
 tauri-plugin-process = "2.3.1"
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", rev = "45af25f4984d14c65663ed43541d2e641752f66d", features = ["component-model", "component-model-async"] }
-wasmtime-wasi = { git = "https://github.com/bytecodealliance/wasmtime", rev = "45af25f4984d14c65663ed43541d2e641752f66d", default-features = false, features = ["p2"] }
-n-plugin-compatibility = { git = "https://git.7n.ai/nitra/n-plugin.git", rev = "14ab626ba27a136f57213083eeb1fe49bf49a38b" }
-n-plugin-oci = { git = "https://git.7n.ai/nitra/n-plugin.git", rev = "14ab626ba27a136f57213083eeb1fe49bf49a38b" }
-n-plugin-package = { git = "https://git.7n.ai/nitra/n-plugin.git", rev = "14ab626ba27a136f57213083eeb1fe49bf49a38b" }
-n-plugin-runtime = { git = "https://git.7n.ai/nitra/n-plugin.git", rev = "14ab626ba27a136f57213083eeb1fe49bf49a38b" }
-n-plugin-wkg = { git = "https://git.7n.ai/nitra/n-plugin.git", rev = "14ab626ba27a136f57213083eeb1fe49bf49a38b" }
+wasmtime = { version = "=48.0.3", features = ["component-model", "component-model-async"] }
+wasmtime-wasi = { version = "=48.0.3", default-features = false, features = ["p2"] }
+n-plugin-compatibility = { version = "=0.2.1", registry = "crates-7n" }
+n-plugin-oci = { version = "=0.2.1", registry = "crates-7n" }
+n-plugin-package = { version = "=0.2.1", registry = "crates-7n" }
+n-plugin-runtime = { version = "=0.2.1", registry = "crates-7n" }
+n-plugin-wkg = { version = "=0.2.1", registry = "crates-7n" }
 anyhow = "1"
 
 [target.'cfg(target_os = "android")'.dependencies]
