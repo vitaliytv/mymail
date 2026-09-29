@@ -1,2 +1,5 @@
+[registries.crates-7n]
+index = "sparse+https://crates.7n.ai/api/v1/crates/"
+
 [alias]
 xtask = "run --package xtask --"
