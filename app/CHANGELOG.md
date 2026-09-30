@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.3] - 2026-09-30
+
+### Changed
+
+- macOS DMG нотаризується через `xcrun notarytool` з keychain-профілем `nitra-notary` на ранері (App Store Connect API key), а ticket пришивається до DMG; облікові дані Apple більше не потрібні в Infisical. Android APK збирається лише для `arm64` (`MyMail_X.Y.Z_arm64.apk`): збірка всіх чотирьох ABI перевищувала 3-годинний тайм-аут ранера.
+
 ## [0.31.2] - 2026-09-29
 
 ### Fixed
