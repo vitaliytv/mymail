@@ -369,7 +369,12 @@
     "codesign",
     "xtask",
     "mymail",
-    "codesigning"
+    "codesigning",
+    "notarytool",
+    "spctl",
+    "нотаризується",
+    "ранера",
+    "ранері"
   ],
   "useGitignore": true,
   "gitignoreRoot": "."

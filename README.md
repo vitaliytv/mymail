@@ -9,9 +9,9 @@
 1. Кожна зміна `app/` супроводжується change-файлом у `app/.changes/` (`npx @7n/n ch`).
 2. Після merge у `main` job `prepare-release-pr` запускає `n-rules release`, який бампає `app/package.json` і дописує `app/CHANGELOG.md`, і відкриває PR `release/vX.Y.Z` з комітом `chore(release): vX.Y.Z`. Автоматизація ніколи не пушить у `main` напряму.
 3. Merge release PR → `tag-release` ставить annotated tag `vX.Y.Z` і запускає `release.yml` на тезі.
-4. На тезі: `validate` → draft release → паралельні збірки на Mac mini (`macos-arm64`, спільний з `foc`): підписаний ARM64 DMG, updater archive, `latest.json`, Android APK → collector (`SHA256SUMS`, `MANIFEST.txt`, upload) → публікація релізу. Updater бачить нову версію лише після публікації.
+4. На тезі: `validate` → draft release → паралельні збірки на Mac mini (`macos-arm64`, спільний з `foc`): підписаний і нотаризований ARM64 DMG, updater archive, `latest.json`, Android APK (`arm64`) → collector (`SHA256SUMS`, `MANIFEST.txt`, upload) → публікація релізу. Updater бачить нову версію лише після публікації.
 
-Forgejo-токени видаються через одну OIDC Authorized Integration репозиторію, обмежену `release.yml` (`RELEASE_AUDIENCE`). Як у `foc`, DMG підписується Developer ID-сертифікатом, установленим у keychain Mac mini (`APPLE_SIGNING_IDENTITY` — його назва, задана у workflow); Infisical постачає лише облікові дані нотаризації (`APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`) і ключ updater (`TAURI_SIGNING_PRIVATE_KEY`). GitHub Actions для релізу не використовуються. Як і `foc`, збірка не клонує `internal`-репозиторії: crate-и `n-plugin-*` беруться з реєстру `crates-7n` (`.cargo/config.toml`, читання без токена), тому release job-ам не потрібна git-авторизація. Intel Mac не підтримуються у нових desktop releases.
+Forgejo-токени видаються через одну OIDC Authorized Integration репозиторію, обмежену `release.yml` (`RELEASE_AUDIENCE`). Як у `foc`, DMG підписується Developer ID-сертифікатом, установленим у keychain Mac mini (`APPLE_SIGNING_IDENTITY` — його назва, задана у workflow). DMG нотаризується `xcrun notarytool` через keychain-профіль `nitra-notary` (App Store Connect API key, `NOTARY_KEYCHAIN_PROFILE` у workflow), ticket пришивається до DMG (`stapler`). Infisical постачає лише ключ updater (`TAURI_SIGNING_PRIVATE_KEY`) і Android keystore. GitHub Actions для релізу не використовуються. Як і `foc`, збірка не клонує `internal`-репозиторії: crate-и `n-plugin-*` беруться з реєстру `crates-7n` (`.cargo/config.toml`, читання без токена), тому release job-ам не потрібна git-авторизація. Intel Mac не підтримуються у нових desktop releases.
 
 ### Локальна перевірка assets
 
@@ -21,14 +21,15 @@ Forgejo-токени видаються через одну OIDC Authorized Inte
 infisical --domain https://secret.7n.ai init
 ```
 
-Потім на чистому checkout тегу `vX.Y.Z`:
+На Mac потрібні Developer ID-сертифікат у keychain і notarytool-профіль (одноразово: `xcrun notarytool store-credentials nitra-notary --key AuthKey_….p8 --key-id … --issuer …`). Потім на чистому checkout тегу `vX.Y.Z`:
 
 ```sh
-infisical --domain https://secret.7n.ai run --env=main --path=/apple --path=/updater -- \
+APPLE_SIGNING_IDENTITY="Developer ID Application: N.itra ou (UHG6A28MTA)" NOTARY_KEYCHAIN_PROFILE=nitra-notary \
+  infisical --domain https://secret.7n.ai run --env=main --path=/updater -- \
   cargo xtask release-assets X.Y.Z
 ```
 
-Команда перевіряє, що `app/package.json` має версію `X.Y.Z` і тег вказує на HEAD, і створює `dist/MyMail-vX.Y.Z/`: DMG, updater archive, signature, SHA256SUMS і latest.json. Вона нічого не комітить, не тегує і не змінює стан на сервері.
+Команда перевіряє, що `app/package.json` має версію `X.Y.Z` і тег вказує на HEAD, і створює `dist/MyMail-vX.Y.Z/`: нотаризований DMG, updater archive, signature, SHA256SUMS і latest.json. Вона нічого не комітить, не тегує і не змінює стан на сервері.
 
 Далі, ми додаємо авторизацію на Google і там, і там.
 

@@ -27,25 +27,24 @@ fi
 [[ $(git rev-parse "$tag^{commit}") == $(git rev-parse HEAD) ]] ||
   fail "$tag must point at HEAD"
 
-for command in bun codesign security hdiutil shasum node rustup; do
+for command in bun codesign security hdiutil shasum node rustup xcrun; do
   command -v "$command" >/dev/null || fail "missing required command: $command"
 done
 
 # Sign with the Developer ID identity installed in the runner keychain, as foc does;
 # a certificate from the environment would make Tauri import it into a temporary keychain.
 unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
+# Notarization uses the notarytool keychain profile below, so Tauri must not notarize itself.
+unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY APPLE_API_KEY_PATH
 
-for variable in \
-  APPLE_SIGNING_IDENTITY \
-  APPLE_ID \
-  APPLE_PASSWORD \
-  APPLE_TEAM_ID \
-  TAURI_SIGNING_PRIVATE_KEY; do
-  [[ -n ${!variable:-} ]] || fail "missing $variable; run through Infisical"
-done
+[[ -n ${APPLE_SIGNING_IDENTITY:-} ]] || fail "missing APPLE_SIGNING_IDENTITY; name of the Developer ID identity in the keychain"
+[[ -n ${NOTARY_KEYCHAIN_PROFILE:-} ]] || fail "missing NOTARY_KEYCHAIN_PROFILE; see xcrun notarytool store-credentials"
+[[ -n ${TAURI_SIGNING_PRIVATE_KEY:-} ]] || fail "missing TAURI_SIGNING_PRIVATE_KEY; run through Infisical"
 
 security find-identity -v -p codesigning | grep -Fq "\"$APPLE_SIGNING_IDENTITY\"" ||
   fail "signing identity $APPLE_SIGNING_IDENTITY is not installed in the keychain"
+xcrun notarytool history --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" >/dev/null ||
+  fail "notarytool keychain profile $NOTARY_KEYCHAIN_PROFILE is not usable"
 
 manifest=app/package.json
 output_dir="dist/MyMail-v$version"
@@ -66,15 +65,30 @@ updater=$(find "$updater_dir" -maxdepth 1 -type f -name '*.app.tar.gz' -print -q
 [[ -n $updater ]] || fail "Tauri did not create an updater archive in $updater_dir"
 [[ -f "$updater.sig" ]] || fail "Tauri did not create an updater signature for $updater"
 
+codesign --verify --deep --strict --verbose=2 "$updater_dir/MyMail.app"
+hdiutil verify "$dmg"
+
+# Notarizing the DMG also issues the ticket for the signed app inside it; the ticket is stapled to the DMG.
+notary_log=$(mktemp)
+# The JSON status decides, so a non-zero exit still reaches the notarization log below.
+xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait --output-format json > "$notary_log" || true
+cat "$notary_log"
+notary_status=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).status" "$notary_log")
+if [[ $notary_status != Accepted ]]; then
+  notary_id=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).id" "$notary_log")
+  xcrun notarytool log "$notary_id" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" >&2 || true
+  fail "notarization of $dmg finished with status $notary_status"
+fi
+xcrun stapler staple "$dmg"
+xcrun stapler validate "$dmg"
+spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+
 mkdir -p "$output_dir"
 dmg_artifact="MyMail_${version}_arm64.dmg"
 updater_artifact="MyMail_${version}_arm64.app.tar.gz"
 cp "$dmg" "$output_dir/$dmg_artifact"
 cp "$updater" "$output_dir/$updater_artifact"
 cp "$updater.sig" "$output_dir/$updater_artifact.sig"
-
-codesign --verify --deep --strict --verbose=2 "$updater_dir/MyMail.app"
-hdiutil verify "$dmg"
 
 (
   cd "$output_dir"
