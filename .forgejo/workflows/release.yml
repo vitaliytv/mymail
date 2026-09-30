@@ -195,8 +195,9 @@ jobs:
 
   build-android:
     needs: create-release
-    # Android SDK is maintained on the Mac mini runner.
-    runs-on: macos-arm64
+    # Intel Mac runner shared with foc: builds the APK in parallel with the DMG on macos-arm64.
+    # The APK is cross-compiled, so the host architecture does not change the output.
+    runs-on: macos-x86_64
     enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6
@@ -207,13 +208,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Configure installed Android SDK
+      - name: Point the Android SDK at a persistent runner directory
         run: |
-          SDK_ROOT="${ANDROID_HOME:-$HOME/.android/sdk}"
-          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -path '*/bin/sdkmanager' -type f -print -quit)
-          test -n "$SDKMANAGER"
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          # setup-android installs into ANDROID_SDK_ROOT once and reuses it on later runs.
+          echo "ANDROID_HOME=${HOME}/.android/sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=${HOME}/.android/sdk" >> "$GITHUB_ENV"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
