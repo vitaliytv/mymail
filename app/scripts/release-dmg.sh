@@ -39,7 +39,7 @@ unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY APPLE
 
 [[ -n ${APPLE_SIGNING_IDENTITY:-} ]] || fail "missing APPLE_SIGNING_IDENTITY; name of the Developer ID identity in the keychain"
 [[ -n ${NOTARY_KEYCHAIN_PROFILE:-} ]] || fail "missing NOTARY_KEYCHAIN_PROFILE; see xcrun notarytool store-credentials"
-[[ -n ${TAURI_SIGNING_PRIVATE_KEY:-} ]] || fail "missing TAURI_SIGNING_PRIVATE_KEY; run through Infisical"
+[[ -n ${TAURI_SIGNING_PRIVATE_KEY:-} ]] || fail "missing TAURI_SIGNING_PRIVATE_KEY; the updater signing key (Forgejo Actions secret in CI)"
 
 security find-identity -v -p codesigning | grep -Fq "\"$APPLE_SIGNING_IDENTITY\"" ||
   fail "signing identity $APPLE_SIGNING_IDENTITY is not installed in the keychain"

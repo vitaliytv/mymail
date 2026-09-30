@@ -170,18 +170,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
-      - name: Fetch macOS signing secrets from Infisical
-        uses: Infisical/secrets-action@v1.0.16
-        with:
-          method: "oidc"
-          domain: "https://secret.7n.ai"
-          identity-id: "7fe58b83-70e0-4dba-9054-b0ab0a3697ef"
-          oidc-audience: "git.7n.ai/vitaliytv/mymail"
-          project-slug: "git-7n-ai-runners"
-          env-slug: "prod"
-          secret-path: "/mymail"
       - name: Build signed DMG and updater archive
         env:
+          # Updater signing key: a Forgejo Actions secret of this repository, as in maya/release.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Name of the Developer ID identity in the runner keychain, as foc passes it; not a secret.
           # cspell:disable-next-line
           APPLE_SIGNING_IDENTITY: "Developer ID Application: N.itra ou (UHG6A28MTA)"
