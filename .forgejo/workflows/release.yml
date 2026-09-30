@@ -185,6 +185,8 @@ jobs:
           # Name of the Developer ID identity in the runner keychain, as foc passes it; not a secret.
           # cspell:disable-next-line
           APPLE_SIGNING_IDENTITY: "Developer ID Application: N.itra ou (UHG6A28MTA)"
+          # notarytool keychain profile (App Store Connect API key) stored on the runner; not a secret.
+          NOTARY_KEYCHAIN_PROFILE: nitra-notary
         run: bun --cwd=app run release:dmg "${GITHUB_REF_NAME#v}"
       - name: Stage macOS assets
         run: |
@@ -225,7 +227,7 @@ jobs:
           ndk-version: r27
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
@@ -251,14 +253,16 @@ jobs:
       - name: Build signed APK
         env:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: bun --cwd=app run tauri android build --apk
+        # arm64 covers current devices; building all four ABIs exceeded the runner's 3h job timeout.
+        run: bun --cwd=app run tauri android build --apk --target aarch64
       - name: Stage Android asset
         run: |
           set -eu
           mkdir -p release-assets
-          src=$(find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name '*.apk' | head -1)
+          # The flavor directory (universal or arm64) depends on the Tauri target selection.
+          src=$(find app/src-tauri/gen/android/app/build/outputs/apk -path '*/release/*.apk' | head -1)
           test -n "${src}"
-          cp "${src}" "release-assets/MyMail_${GITHUB_REF_NAME#v}_universal.apk"
+          cp "${src}" "release-assets/MyMail_${GITHUB_REF_NAME#v}_arm64.apk"
       - uses: actions/upload-artifact@v3
         with:
           name: release-android
@@ -283,7 +287,7 @@ jobs:
             printf 'release-assets/MyMail_%s_arm64.dmg\n' "${version}"
             printf 'release-assets/MyMail_%s_arm64.app.tar.gz\n' "${version}"
             printf 'release-assets/MyMail_%s_arm64.app.tar.gz.sig\n' "${version}"
-            printf 'release-assets/MyMail_%s_universal.apk\n' "${version}"
+            printf 'release-assets/MyMail_%s_arm64.apk\n' "${version}"
             printf 'release-assets/latest.json\n'
             printf 'ASSETS\n'
           } >> "${GITHUB_OUTPUT}"
