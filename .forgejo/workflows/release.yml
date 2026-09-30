@@ -215,10 +215,12 @@ jobs:
           test -n "$SDKMANAGER"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-      - uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r27
+      - name: Configure installed Android NDK
+        run: |
+          # NDK r27 (the same build setup-ndk fetched as "r27") is preinstalled next to the SDK.
+          NDK_DIR="${ANDROID_HOME}/ndk/27.0.12077973"
+          test -f "${NDK_DIR}/source.properties"
+          echo "NDK_HOME=${NDK_DIR}" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
@@ -245,8 +247,6 @@ jobs:
             echo "keyPassword=$ANDROID_KEYSTORE_PASSWORD"
           } > app/src-tauri/gen/android/keystore.properties
       - name: Build signed APK
-        env:
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         # arm64 covers current devices; building all four ABIs exceeded the runner's 3h job timeout.
         run: bun --cwd=app run tauri android build --apk --target aarch64
       - name: Stage Android asset
