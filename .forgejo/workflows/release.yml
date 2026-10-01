@@ -264,6 +264,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
+      - name: Use rustup proxies instead of the runner's pinned cargo wrappers
+        run: |
+          set -eu
+          # air11's ~/.cargo/bin/cargo and rustc are wrappers that pin Rust 1.93.0 for foc and
+          # ignore the toolchain chosen above; Wasmtime 48 needs Rust >= 1.95. Homebrew's per-tool
+          # rustup wrappers keep the tool name, so they honour the stable default set above.
+          # Added after rust-toolchain, whose ~/.cargo/bin entry would otherwise come first on PATH.
+          echo "/usr/local/opt/rustup/bin" >> "$GITHUB_PATH"
+      - name: Show Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
