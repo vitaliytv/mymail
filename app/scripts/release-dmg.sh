@@ -55,12 +55,15 @@ manifest_version=$(node -p "require('./$manifest').version")
   fail "$manifest has version $manifest_version; build from the merged release tag $tag"
 
 rustup target add aarch64-apple-darwin
+# CI keeps CARGO_TARGET_DIR on the runner between releases; drop old bundles so only this build's DMG is found.
+target_dir=${CARGO_TARGET_DIR:-target}
+rm -rf "$target_dir/aarch64-apple-darwin/release/bundle"
 CI=true bun --cwd=app run tauri build --target aarch64-apple-darwin --bundles app,dmg
 
-bundle_dir=target/aarch64-apple-darwin/release/bundle/dmg
+bundle_dir=$target_dir/aarch64-apple-darwin/release/bundle/dmg
 dmg=$(find "$bundle_dir" -maxdepth 1 -type f -name '*.dmg' -print -quit)
 [[ -n $dmg ]] || fail "Tauri did not create a DMG in $bundle_dir"
-updater_dir=target/aarch64-apple-darwin/release/bundle/macos
+updater_dir=$target_dir/aarch64-apple-darwin/release/bundle/macos
 updater=$(find "$updater_dir" -maxdepth 1 -type f -name '*.app.tar.gz' -print -quit)
 [[ -n $updater ]] || fail "Tauri did not create an updater archive in $updater_dir"
 [[ -f "$updater.sig" ]] || fail "Tauri did not create an updater signature for $updater"
@@ -70,13 +73,28 @@ hdiutil verify "$dmg"
 
 # Notarizing the DMG also issues the ticket for the signed app inside it; the ticket is stapled to the DMG.
 notary_log=$(mktemp)
-# The JSON status decides, so a non-zero exit still reaches the notarization log below.
-xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait --output-format json > "$notary_log" || true
+notary_err=$(mktemp)
+# The JSON status decides, so a non-zero exit still reaches the checks below.
+notary_exit=0
+xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait --output-format json \
+  > "$notary_log" 2> "$notary_err" || notary_exit=$?
 cat "$notary_log"
-notary_status=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).status" "$notary_log")
+# Prints "<status> <id>", or nothing when notarytool wrote no JSON (e.g. the upload to Apple was aborted).
+notary_result=$(node -e '
+  try {
+    const result = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))
+    console.log((result.status || "") + " " + (result.id || ""))
+  } catch {}
+' "$notary_log")
+read -r notary_status notary_id <<< "$notary_result" || true
+if [[ -z ${notary_status:-} ]]; then
+  cat "$notary_err" >&2
+  fail "notarytool submit returned no result (exit $notary_exit); the upload of $dmg to Apple likely failed (see notarytool output above), rerun the release"
+fi
 if [[ $notary_status != Accepted ]]; then
-  notary_id=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).id" "$notary_log")
-  xcrun notarytool log "$notary_id" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" >&2 || true
+  if [[ -n ${notary_id:-} ]]; then
+    xcrun notarytool log "$notary_id" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" >&2 || true
+  fi
   fail "notarization of $dmg finished with status $notary_status"
 fi
 xcrun stapler staple "$dmg"
