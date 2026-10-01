@@ -374,7 +374,8 @@
     "spctl",
     "нотаризується",
     "ранера",
-    "ранері"
+    "ранері",
+    "rustc"
   ],
   "useGitignore": true,
   "gitignoreRoot": "."
