@@ -261,9 +261,21 @@ jobs:
           } >> "$GITHUB_ENV"
           # Big Sur Node and Bun 1.1.20 live in ~/.local/bin; Gradle calls `bun tauri …` itself.
           echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
+      - name: Configure installed Rust toolchain
+        run: |
+          set -eu
+          # air11's ~/.cargo/bin/cargo and rustc are wrappers that pin Rust 1.93.0 for foc;
+          # Wasmtime 48 needs Rust >= 1.95. Homebrew's per-tool rustup wrappers keep the tool
+          # name and honour RUSTUP_TOOLCHAIN, so the stable toolchain installed on the runner
+          # is used without dtolnay/rust-toolchain; foc's wrappers stay untouched.
+          RUSTUP_BIN=/usr/local/opt/rustup/bin
+          export PATH="${RUSTUP_BIN}:${PATH}" RUSTUP_TOOLCHAIN=stable
+          rustup target list --installed | grep -qx aarch64-linux-android ||
+            rustup target add aarch64-linux-android
+          rustc --version
+          cargo --version
+          echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+          echo "${RUSTUP_BIN}" >> "$GITHUB_PATH"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: . -> target
