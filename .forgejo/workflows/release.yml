@@ -193,34 +193,72 @@ jobs:
           name: release-macos-arm64
           path: release-assets
 
-  build-android:
+  android-deps:
     needs: create-release
-    # Intel Mac runner shared with foc: builds the APK in parallel with the DMG on macos-arm64.
-    # The APK is cross-compiled, so the host architecture does not change the output.
+    # air11 runs macOS 11, where no Bun that reads bun.lock starts (Bun >= 1.1.21 needs macOS 13).
+    # Install the JS dependencies for darwin-x64 here and hand them over; air11 only runs scripts.
+    # Deliberately not setup-bun-deps: its cache would store these darwin node_modules under the
+    # linux key used by other jobs on this runner.
+    runs-on: release-arm64
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+      - name: Install darwin-x64 dependencies from bun.lock
+        run: bun install --frozen-lockfile --os=darwin --cpu=x64 --ignore-scripts
+      - name: Pack node_modules
+        run: |
+          set -eu
+          # tar keeps the symlinks (workspace packages, .bin) that a zipped artifact would lose.
+          find . -path ./target -prune -o -name node_modules -type d -prune -print > node-modules.list
+          cat node-modules.list
+          tar -czf android-node-modules.tar.gz -T node-modules.list
+          ls -lh android-node-modules.tar.gz
+      - uses: actions/upload-artifact@v3
+        with:
+          name: android-node-modules
+          path: android-node-modules.tar.gz
+
+  build-android:
+    needs: [create-release, android-deps]
+    # Intel Mac runner shared with foc (air11, macOS 11): builds the APK in parallel with the DMG
+    # on macos-arm64. The APK is cross-compiled, so the host architecture does not change it.
+    # JDK, Android SDK, NDK, Node (Big Sur build) and Bun 1.1.20 are preinstalled on the runner.
     runs-on: macos-x86_64
     enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-bun-deps
-      - uses: actions/setup-java@v4
+      - uses: actions/download-artifact@v3
         with:
-          distribution: temurin
-          java-version: "17"
-      - name: Configure installed Android SDK
+          name: android-node-modules
+          path: android-deps
+      - name: Unpack darwin-x64 node_modules
         run: |
-          SDK_ROOT="${ANDROID_HOME:-$HOME/.android/sdk}"
-          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -path '*/bin/sdkmanager' -type f -print -quit)
-          test -n "$SDKMANAGER"
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-      - name: Configure installed Android NDK
+          set -eu
+          archive=$(find android-deps -name android-node-modules.tar.gz -print -quit)
+          test -n "${archive}"
+          tar -xzf "${archive}"
+          rm -rf android-deps
+      - name: Configure installed JDK, Android SDK and NDK
         run: |
-          # NDK r27 (the same build setup-ndk fetched as "r27") is preinstalled next to the SDK.
-          NDK_DIR="${ANDROID_HOME}/ndk/27.0.12077973"
+          set -eu
+          JDK="${HOME}/.local/opt/jdk-17/Contents/Home"
+          SDK_ROOT="${HOME}/.android/sdk"
+          NDK_DIR="${SDK_ROOT}/ndk/27.0.12077973"
+          "${JDK}/bin/java" -version
+          test -x "${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
           test -f "${NDK_DIR}/source.properties"
-          echo "NDK_HOME=${NDK_DIR}" >> "$GITHUB_ENV"
+          {
+            echo "JAVA_HOME=${JDK}"
+            echo "ANDROID_HOME=${SDK_ROOT}"
+            echo "ANDROID_SDK_ROOT=${SDK_ROOT}"
+            echo "NDK_HOME=${NDK_DIR}"
+          } >> "$GITHUB_ENV"
+          # Big Sur Node and Bun 1.1.20 live in ~/.local/bin; Gradle calls `bun tauri …` itself.
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
@@ -247,8 +285,13 @@ jobs:
             echo "keyPassword=$ANDROID_KEYSTORE_PASSWORD"
           } > app/src-tauri/gen/android/keystore.properties
       - name: Build signed APK
-        # arm64 covers current devices; building all four ABIs exceeded the runner's 3h job timeout.
-        run: bun --cwd=app run tauri android build --apk --target aarch64
+        working-directory: app
+        run: |
+          set -eu
+          node --version
+          bun --version
+          # arm64 covers current devices; building all four ABIs exceeded the runner's 3h job timeout.
+          bun run tauri android build --apk --target aarch64
       - name: Stage Android asset
         run: |
           set -eu
