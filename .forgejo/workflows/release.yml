@@ -167,9 +167,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: . -> target
+      - name: Keep the Rust build directory on the runner
+        run: |
+          # As foc does: a persistent target dir lets later releases rebuild only what changed,
+          # instead of a full ~1h compile (rust-cache never hit and uploads gigabytes).
+          dir="${HOME}/Library/Caches/mymail/cargo-target"
+          mkdir -p "${dir}"
+          echo "CARGO_TARGET_DIR=${dir}" >> "$GITHUB_ENV"
       - name: Build signed DMG and updater archive
         env:
           # Updater signing key: a Forgejo Actions secret of this repository, as in maya/release.
@@ -193,58 +197,18 @@ jobs:
           name: release-macos-arm64
           path: release-assets
 
-  android-deps:
-    needs: create-release
-    # air11 runs macOS 11, where no Bun that reads bun.lock starts (Bun >= 1.1.21 needs macOS 13).
-    # Install the JS dependencies for darwin-x64 here and hand them over; air11 only runs scripts.
-    # Deliberately not setup-bun-deps: its cache would store these darwin node_modules under the
-    # linux key used by other jobs on this runner. Bun is preinstalled in the release-arm64 image.
-    runs-on: release-arm64
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Install darwin-x64 dependencies from bun.lock
-        run: |
-          set -eu
-          bun --version
-          bun install --frozen-lockfile --os=darwin --cpu=x64 --ignore-scripts
-      - name: Pack node_modules
-        run: |
-          set -eu
-          # tar keeps the symlinks (workspace packages, .bin) that a zipped artifact would lose.
-          find . -path ./target -prune -o -name node_modules -type d -prune -print > node-modules.list
-          cat node-modules.list
-          tar -czf android-node-modules.tar.gz -T node-modules.list
-          ls -lh android-node-modules.tar.gz
-      - uses: actions/upload-artifact@v3
-        with:
-          name: android-node-modules
-          path: android-node-modules.tar.gz
-
   build-android:
-    needs: [create-release, android-deps]
+    needs: create-release
     # Intel Mac runner shared with foc (air11, macOS 11): builds the APK in parallel with the DMG
     # on macos-arm64. The APK is cross-compiled, so the host architecture does not change it.
-    # JDK, Android SDK, NDK, Node (Big Sur build) and Bun 1.1.20 are preinstalled on the runner.
+    # JDK, Android SDK, NDK, Rust, Node and Bun (Big Sur builds) are preinstalled on the runner.
     runs-on: macos-x86_64
     enable-openid-connect: true
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v3
-        with:
-          name: android-node-modules
-          path: android-deps
-      - name: Unpack darwin-x64 node_modules
-        run: |
-          set -eu
-          archive=$(find android-deps -name android-node-modules.tar.gz -print -quit)
-          test -n "${archive}"
-          tar -xzf "${archive}"
-          rm -rf android-deps
-      - name: Configure installed JDK, Android SDK and NDK
+      - name: Configure installed JDK, Android SDK, NDK and build directory
         run: |
           set -eu
           JDK="${HOME}/.local/opt/jdk-17/Contents/Home"
@@ -259,8 +223,18 @@ jobs:
             echo "ANDROID_SDK_ROOT=${SDK_ROOT}"
             echo "NDK_HOME=${NDK_DIR}"
           } >> "$GITHUB_ENV"
-          # Big Sur Node and Bun 1.1.20 live in ~/.local/bin; Gradle calls `bun tauri …` itself.
+          # Persistent Rust build directory, as on macos-arm64.
+          mkdir -p "${HOME}/Library/Caches/mymail/cargo-target"
+          echo "CARGO_TARGET_DIR=${HOME}/Library/Caches/mymail/cargo-target" >> "$GITHUB_ENV"
+          # Big Sur builds of Node and Bun live in ~/.local/bin; Gradle calls `bun tauri …` itself.
           echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+      - name: Install dependencies with the runner's Bun
+        # setup-bun-deps cannot run here: official Node and Bun need macOS 13, air11 runs macOS 11.
+        run: |
+          set -eu
+          node --version
+          bun --version
+          bun install --frozen-lockfile
       - name: Configure installed Rust toolchain
         run: |
           set -eu
@@ -276,9 +250,6 @@ jobs:
           cargo --version
           echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
           echo "${RUSTUP_BIN}" >> "$GITHUB_PATH"
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: . -> target
       - name: Fetch Android secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -302,8 +273,6 @@ jobs:
         working-directory: app
         run: |
           set -eu
-          node --version
-          bun --version
           # arm64 covers current devices; building all four ABIs exceeded the runner's 3h job timeout.
           bun run tauri android build --apk --target aarch64
       - name: Stage Android asset

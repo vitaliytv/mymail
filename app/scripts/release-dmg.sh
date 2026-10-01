@@ -55,12 +55,15 @@ manifest_version=$(node -p "require('./$manifest').version")
   fail "$manifest has version $manifest_version; build from the merged release tag $tag"
 
 rustup target add aarch64-apple-darwin
+# CI keeps CARGO_TARGET_DIR on the runner between releases; drop old bundles so only this build's DMG is found.
+target_dir=${CARGO_TARGET_DIR:-target}
+rm -rf "$target_dir/aarch64-apple-darwin/release/bundle"
 CI=true bun --cwd=app run tauri build --target aarch64-apple-darwin --bundles app,dmg
 
-bundle_dir=target/aarch64-apple-darwin/release/bundle/dmg
+bundle_dir=$target_dir/aarch64-apple-darwin/release/bundle/dmg
 dmg=$(find "$bundle_dir" -maxdepth 1 -type f -name '*.dmg' -print -quit)
 [[ -n $dmg ]] || fail "Tauri did not create a DMG in $bundle_dir"
-updater_dir=target/aarch64-apple-darwin/release/bundle/macos
+updater_dir=$target_dir/aarch64-apple-darwin/release/bundle/macos
 updater=$(find "$updater_dir" -maxdepth 1 -type f -name '*.app.tar.gz' -print -quit)
 [[ -n $updater ]] || fail "Tauri did not create an updater archive in $updater_dir"
 [[ -f "$updater.sig" ]] || fail "Tauri did not create an updater signature for $updater"
