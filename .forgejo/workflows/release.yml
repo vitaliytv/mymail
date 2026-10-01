@@ -198,15 +198,17 @@ jobs:
     # air11 runs macOS 11, where no Bun that reads bun.lock starts (Bun >= 1.1.21 needs macOS 13).
     # Install the JS dependencies for darwin-x64 here and hand them over; air11 only runs scripts.
     # Deliberately not setup-bun-deps: its cache would store these darwin node_modules under the
-    # linux key used by other jobs on this runner.
+    # linux key used by other jobs on this runner. Bun is preinstalled in the release-arm64 image.
     runs-on: release-arm64
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
       - name: Install darwin-x64 dependencies from bun.lock
-        run: bun install --frozen-lockfile --os=darwin --cpu=x64 --ignore-scripts
+        run: |
+          set -eu
+          bun --version
+          bun install --frozen-lockfile --os=darwin --cpu=x64 --ignore-scripts
       - name: Pack node_modules
         run: |
           set -eu
