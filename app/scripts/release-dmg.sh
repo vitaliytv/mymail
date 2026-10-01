@@ -74,22 +74,34 @@ hdiutil verify "$dmg"
 # Notarizing the DMG also issues the ticket for the signed app inside it; the ticket is stapled to the DMG.
 notary_log=$(mktemp)
 notary_err=$(mktemp)
-# The JSON status decides, so a non-zero exit still reaches the checks below.
-notary_exit=0
-xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait --output-format json \
-  > "$notary_log" 2> "$notary_err" || notary_exit=$?
-cat "$notary_log"
-# Prints "<status> <id>", or nothing when notarytool wrote no JSON (e.g. the upload to Apple was aborted).
-notary_result=$(node -e '
-  try {
-    const result = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))
-    console.log((result.status || "") + " " + (result.id || ""))
-  } catch {}
-' "$notary_log")
-read -r notary_status notary_id <<< "$notary_result" || true
-if [[ -z ${notary_status:-} ]]; then
+# notarytool sometimes aborts the upload to Apple's storage and writes no result; retry those attempts.
+notary_attempts=3
+notary_retry_delay=${NOTARY_RETRY_DELAY:-60}
+notary_status=""
+notary_id=""
+for ((notary_attempt = 1; notary_attempt <= notary_attempts; notary_attempt++)); do
+  # The JSON status decides, so a non-zero exit still reaches the checks below.
+  notary_exit=0
+  xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait --output-format json \
+    > "$notary_log" 2> "$notary_err" || notary_exit=$?
+  cat "$notary_log"
+  # Prints "<status> <id>", or nothing when notarytool wrote no JSON (e.g. the upload to Apple was aborted).
+  notary_result=$(node -e '
+    try {
+      const result = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))
+      console.log((result.status || "") + " " + (result.id || ""))
+    } catch {}
+  ' "$notary_log")
+  read -r notary_status notary_id <<< "$notary_result" || true
+  [[ -z ${notary_status:-} ]] || break
   cat "$notary_err" >&2
-  fail "notarytool submit returned no result (exit $notary_exit); the upload of $dmg to Apple likely failed (see notarytool output above), rerun the release"
+  if ((notary_attempt < notary_attempts)); then
+    echo "release-dmg: notarytool submit returned no result (exit $notary_exit), attempt $notary_attempt of $notary_attempts; retrying in ${notary_retry_delay}s" >&2
+    sleep "$notary_retry_delay"
+  fi
+done
+if [[ -z ${notary_status:-} ]]; then
+  fail "notarytool submit returned no result in $notary_attempts attempts (last exit $notary_exit); the upload of $dmg to Apple likely failed (see notarytool output above), rerun the release"
 fi
 if [[ $notary_status != Accepted ]]; then
   if [[ -n ${notary_id:-} ]]; then
