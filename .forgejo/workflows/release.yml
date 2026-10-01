@@ -13,8 +13,9 @@ env:
   RELEASE_AUDIENCE: u:3:43ba5066-a51c-4458-b3fa-3973d021a9f4
 
 concurrency:
-  # A main push may supersede an older preparation run, but must never cancel a tag release.
-  group: mymail-release-${{ github.ref }}
+  # All tag releases share one group, so a newer release cancels an older one still building on the
+  # same single-capacity runners; main pushes keep their own group and never cancel a tag release.
+  group: mymail-release-${{ github.ref_type == 'tag' && 'tags' || github.ref }}
   cancel-in-progress: true
 
 jobs:
