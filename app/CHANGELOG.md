@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.6] - 2026-10-01
+
+### Fixed
+
+- Android APK знову збирається на Intel-ранері `air11` (macOS 11): JS-залежності під darwin-x64 встановлює окремий job з `bun.lock`, а на ранері лише запускаються скрипти через Bun 1.1.20 і Node, зібраний під Big Sur, з локальними JDK, Android SDK і NDK.
+
 ## [0.31.5] - 2026-09-30
 
 ### Changed
