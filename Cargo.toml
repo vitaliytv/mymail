@@ -8,6 +8,6 @@ members = [
 ]
 
 [profile.release]
-codegen-units = 1
-lto = "thin"
+# Cargo defaults for lto/codegen-units: on an M5 a release rebuild after an app change takes 38 s
+# instead of 2 min 57 s (thin LTO + 1 codegen unit), at +16% binary size (45.0 vs 38.7 MB).
 strip = "symbols"
