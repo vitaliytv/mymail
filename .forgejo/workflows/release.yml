@@ -165,9 +165,21 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-bun-deps
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
+      - name: Configure installed Rust toolchain
+        run: |
+          set -eu
+          # Use the stable toolchain installed on the runner instead of dtolnay/rust-toolchain, which
+          # updates it as soon as a new Rust ships: on 2026-10-02 such an update broke off midway on
+          # this runner's network and left stable without rustc. Update Rust on the runner deliberately.
+          # Homebrew's per-tool rustup wrappers keep the tool name and honour RUSTUP_TOOLCHAIN.
+          RUSTUP_BIN=/opt/homebrew/opt/rustup/bin
+          export PATH="${RUSTUP_BIN}:${PATH}" RUSTUP_TOOLCHAIN=stable
+          rustup target list --installed | grep -qx aarch64-apple-darwin ||
+            rustup target add aarch64-apple-darwin
+          rustc --version
+          cargo --version
+          echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+          echo "${RUSTUP_BIN}" >> "$GITHUB_PATH"
       - name: Keep the Rust build directory on the runner
         run: |
           # As foc does: a persistent target dir lets later releases rebuild only what changed,
