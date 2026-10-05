@@ -43,8 +43,15 @@ unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY APPLE
 
 security find-identity -v -p codesigning | grep -Fq "\"$APPLE_SIGNING_IDENTITY\"" ||
   fail "signing identity $APPLE_SIGNING_IDENTITY is not installed in the keychain"
-xcrun notarytool history --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" >/dev/null ||
-  fail "notarytool keychain profile $NOTARY_KEYCHAIN_PROFILE is not usable"
+# Read the profile from an explicit keychain: notarytool otherwise searches the default keychain,
+# which other release jobs on the shared runner may switch (v0.31.10 failed with "No Keychain
+# password item found" although the profile was in the login keychain).
+notary_keychain=${NOTARY_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}
+notary_auth=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --keychain "$notary_keychain")
+if ! xcrun notarytool history "${notary_auth[@]}" >/dev/null; then
+  echo "release-dmg: default keychain: $(security default-keychain 2>&1)" >&2
+  fail "notarytool keychain profile $NOTARY_KEYCHAIN_PROFILE is not usable in $notary_keychain"
+fi
 
 manifest=app/package.json
 output_dir="dist/MyMail-v$version"
@@ -82,7 +89,7 @@ notary_id=""
 for ((notary_attempt = 1; notary_attempt <= notary_attempts; notary_attempt++)); do
   # The JSON status decides, so a non-zero exit still reaches the checks below.
   notary_exit=0
-  xcrun notarytool submit "$dmg" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait --output-format json \
+  xcrun notarytool submit "$dmg" "${notary_auth[@]}" --wait --output-format json \
     > "$notary_log" 2> "$notary_err" || notary_exit=$?
   cat "$notary_log"
   # Prints "<status> <id>", or nothing when notarytool wrote no JSON (e.g. the upload to Apple was aborted).
@@ -105,7 +112,7 @@ if [[ -z ${notary_status:-} ]]; then
 fi
 if [[ $notary_status != Accepted ]]; then
   if [[ -n ${notary_id:-} ]]; then
-    xcrun notarytool log "$notary_id" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" >&2 || true
+    xcrun notarytool log "$notary_id" "${notary_auth[@]}" >&2 || true
   fi
   fail "notarization of $dmg finished with status $notary_status"
 fi
