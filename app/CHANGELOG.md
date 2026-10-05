@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.11] - 2026-10-05
+
+### Fixed
+
+- Відправка DMG на перевірку Apple (notarytool) читає профіль `nitra-notary` явно з login-ключниці `m1-grey`, а не з ключниці за замовчуванням: реліз v0.31.10 упав з `No Keychain password item found`, хоча профіль був на місці. Шлях можна змінити через `NOTARY_KEYCHAIN`.
+
 ## [0.31.10] - 2026-10-05
 
 ### Changed
