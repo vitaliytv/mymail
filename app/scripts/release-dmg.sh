@@ -43,14 +43,15 @@ unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY APPLE
 
 security find-identity -v -p codesigning | grep -Fq "\"$APPLE_SIGNING_IDENTITY\"" ||
   fail "signing identity $APPLE_SIGNING_IDENTITY is not installed in the keychain"
-# Read the profile from an explicit keychain: notarytool otherwise searches the default keychain,
-# which other release jobs on the shared runner may switch (v0.31.10 failed with "No Keychain
-# password item found" although the profile was in the login keychain).
-notary_keychain=${NOTARY_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}
-notary_auth=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --keychain "$notary_keychain")
+# store-credentials keeps the profile in the "local items" keychain, not in login.keychain-db, so
+# no --keychain path here. That keychain is unavailable while the runner's screen is locked, and
+# notarytool then reports "No Keychain password item found" (v0.31.10).
+notary_auth=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE")
 if ! xcrun notarytool history "${notary_auth[@]}" >/dev/null; then
-  echo "release-dmg: default keychain: $(security default-keychain 2>&1)" >&2
-  fail "notarytool keychain profile $NOTARY_KEYCHAIN_PROFILE is not usable in $notary_keychain"
+  if ioreg -n Root -d1 -a | grep -A1 IOConsoleLocked | grep -q '<true/>'; then
+    echo "release-dmg: the runner's screen is locked; unlock it and turn off the screen lock" >&2
+  fi
+  fail "notarytool keychain profile $NOTARY_KEYCHAIN_PROFILE is not usable"
 fi
 
 manifest=app/package.json

@@ -370,6 +370,7 @@
     "xtask",
     "mymail",
     "codesigning",
+    "ioreg",
     "notarytool",
     "spctl",
     "нотаризується",
