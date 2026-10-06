@@ -168,17 +168,18 @@ jobs:
       - name: Configure installed Rust toolchain
         run: |
           set -eu
-          # Use the stable toolchain installed on the runner instead of dtolnay/rust-toolchain, which
+          # Use the pinned toolchain installed on the runner instead of dtolnay/rust-toolchain, which
           # updates it as soon as a new Rust ships: on 2026-10-02 such an update broke off midway on
-          # this runner's network and left stable without rustc. Update Rust on the runner deliberately.
+          # this runner's network and left stable without rustc. All repos on the macOS runners build
+          # with the same pinned Rust, so they share one sccache. Update Rust on the runner deliberately.
           # Homebrew's per-tool rustup wrappers keep the tool name and honour RUSTUP_TOOLCHAIN.
           RUSTUP_BIN=/opt/homebrew/opt/rustup/bin
-          export PATH="${RUSTUP_BIN}:${PATH}" RUSTUP_TOOLCHAIN=stable
+          export PATH="${RUSTUP_BIN}:${PATH}" RUSTUP_TOOLCHAIN=1.99.0
           rustup target list --installed | grep -qx aarch64-apple-darwin ||
             rustup target add aarch64-apple-darwin
           rustc --version
           cargo --version
-          echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+          echo "RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN}" >> "$GITHUB_ENV"
           echo "${RUSTUP_BIN}" >> "$GITHUB_PATH"
       - name: Keep the Rust build directory on the runner
         run: |
@@ -187,6 +188,13 @@ jobs:
           dir="${HOME}/Library/Caches/mymail/cargo-target"
           mkdir -p "${dir}"
           echo "CARGO_TARGET_DIR=${dir}" >> "$GITHUB_ENV"
+          # One sccache directory for all repos on this runner, capped in size: the sccache server is
+          # per machine, and per-repo caches filled m1-grey's disk on 2026-10-06.
+          {
+            echo "RUSTC_WRAPPER=/opt/homebrew/bin/sccache"
+            echo "SCCACHE_DIR=${HOME}/Library/Caches/sccache"
+            echo "SCCACHE_CACHE_SIZE=20G"
+          } >> "$GITHUB_ENV"
       - name: Build signed DMG and updater archive
         env:
           # Updater signing key: a Forgejo Actions secret of this repository, as in maya/release.
@@ -239,6 +247,12 @@ jobs:
           # Persistent Rust build directory, as on macos-arm64.
           mkdir -p "${HOME}/Library/Caches/mymail/cargo-target"
           echo "CARGO_TARGET_DIR=${HOME}/Library/Caches/mymail/cargo-target" >> "$GITHUB_ENV"
+          # The runner-wide sccache shared with the other repos, as on macos-arm64.
+          {
+            echo "RUSTC_WRAPPER=/usr/local/bin/sccache"
+            echo "SCCACHE_DIR=${HOME}/Library/Caches/sccache"
+            echo "SCCACHE_CACHE_SIZE=20G"
+          } >> "$GITHUB_ENV"
           # Big Sur builds of Node and Bun live in ~/.local/bin; Gradle calls `bun tauri …` itself.
           echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
       - name: Install dependencies with the runner's Bun
@@ -251,17 +265,16 @@ jobs:
       - name: Configure installed Rust toolchain
         run: |
           set -eu
-          # air11's ~/.cargo/bin/cargo and rustc are wrappers that pin Rust 1.93.0 for foc;
-          # Wasmtime 48 needs Rust >= 1.95. Homebrew's per-tool rustup wrappers keep the tool
-          # name and honour RUSTUP_TOOLCHAIN, so the stable toolchain installed on the runner
-          # is used without dtolnay/rust-toolchain; foc's wrappers stay untouched.
+          # The same pinned Rust as on macos-arm64 and in the other repos on these runners (Wasmtime 48
+          # needs >= 1.95). Homebrew's per-tool rustup wrappers keep the tool name and honour
+          # RUSTUP_TOOLCHAIN, so the toolchain installed on the runner is used without dtolnay.
           RUSTUP_BIN=/usr/local/opt/rustup/bin
-          export PATH="${RUSTUP_BIN}:${PATH}" RUSTUP_TOOLCHAIN=stable
+          export PATH="${RUSTUP_BIN}:${PATH}" RUSTUP_TOOLCHAIN=1.99.0
           rustup target list --installed | grep -qx aarch64-linux-android ||
             rustup target add aarch64-linux-android
           rustc --version
           cargo --version
-          echo "RUSTUP_TOOLCHAIN=stable" >> "$GITHUB_ENV"
+          echo "RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN}" >> "$GITHUB_ENV"
           echo "${RUSTUP_BIN}" >> "$GITHUB_PATH"
       - name: Fetch Android secrets from Infisical
         uses: Infisical/secrets-action@v1.0.16
