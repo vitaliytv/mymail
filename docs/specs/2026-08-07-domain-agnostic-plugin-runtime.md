@@ -320,7 +320,7 @@ provenance evidence і не входять до release identity.
 ### 6.3. `wkg`-owned package resolution
 
 Package resolution і runtime activation є послідовними шарами з одним version
-resolver, а не двома конкуруючими package managers:
+resolver, а не двома конкурентними package managers:
 
 ```text
 embedded .n-plugin manifests

@@ -14,7 +14,7 @@
 ## Glossary
 
 | Термін | Значення |
-|---|---|
+| --- | --- |
 | Host | Tauri-застосунок (`mlmail`, `task`), який завантажує плагіни |
 | Platform core | Спільні crates у `tauri-components` (runtime, package, permissions, A2UI adapter) |
 | Domain host | Продуктовий adapter (`mlmail-plugin-host`, `task-plugin-host`) з WIT imports і catalog |
@@ -58,7 +58,7 @@
 ## 2. Ухвалені рішення
 
 | # | Питання | Рішення | MVP / Post |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | A | Runtime | `Wasmtime` embedded у Rust. Кожен плагін — WebAssembly Component; API — WIT. | MVP |
 | Б | Межа репозиторіїв | Platform core у `tauri-components`. Кожен продукт — власний domain host adapter і catalog extensions. | MVP |
 | В | UI плагінів | Плагін повертає декларативні A2UI повідомлення. Vue host рендерить зі свого catalog; без HTML/JS/webview у плагіні. | MVP |
@@ -90,7 +90,7 @@
 ### 3.2. Actors
 
 | Actor | Приклад |
-|---|---|
+| --- | --- |
 | Benign plugin author | Корисний tools-плагін |
 | Malicious plugin | Навмисний ексфільтратор / confuse-deputy |
 | Compromised publisher key | Підписаний зловмисний update |
@@ -139,11 +139,11 @@ plugin-dev-cli/       build, validate, package, sign та local install для a
 #### Compatibility matrix (нормативний намір)
 
 | Шар | Версіонування | Хто ламає / релізить |
-|---|---|---|
+| --- | --- | --- |
 | Platform crates (`plugin-*`) | SemVer crates | `tauri-components` |
 | Platform WIT world | SemVer у manifest `platform` | `tauri-components` |
 | Domain WIT (`nitra:mail`, `nitra:task`) | окремий SemVer | відповідний product repo |
-| Host app | app SemVer; pinує platform crates | `mlmail` / `task` |
+| Host app | app SemVer; фіксує версії platform crates | `mlmail` / `task` |
 | Plugin package | plugin SemVer + required ranges | plugin author |
 
 Breaking WIT → major bump + fixtures «old plugin / new host» і навпаки в CI `tauri-components`; consumer smoke в `mlmail`.
@@ -159,7 +159,7 @@ Platform WIT contract містить:
 - settings read/write через host-managed schema;
 - typed failure categories: `denied`, `invalid-input`, `timeout`, `unavailable`, `plugin-error`.
 
-Domain WIT packages versionуються окремо: `nitra:mail` і `nitra:task`. Плагін у manifest визначає сумісний SemVer range platform і domain packages. Host відхиляє install при несумісності.
+Domain WIT packages мають окремі версії: `nitra:mail` і `nitra:task`. Плагін у manifest визначає сумісний SemVer range platform і domain packages. Host відхиляє install при несумісності.
 
 #### Invocation semantics (нормативно)
 
@@ -196,7 +196,7 @@ Installer приймає package URL або локальний файл одна
 #### Trust MVP (local)
 
 | Режим | Поведінка |
-|---|---|
+| --- | --- |
 | Release host | Потрібен валідний Ed25519 підпис; ключ має бути trusted |
 | Перший publisher key | TOFU: user бачить fingerprint і підтверджує trust |
 | Відомий publisher | Підпис перевіряється проти trusted public-key store (app data) |
@@ -211,7 +211,7 @@ Capability — маленька дія з explicit scope.
 Initial `mlmail` API (MVP):
 
 | Capability | Scope kinds (MVP) | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `mail:metadata.read` | `message`, `account` | без body |
 | `mail:content.read` | `message` only | body; `account` — поза MVP |
 | `mail:draft.create` | `account` | mutating → audit |
@@ -249,7 +249,7 @@ Mutating operation → audit: `plugin_id`, `plugin_version`, `action_id`, `capab
 Ліміти на кожен запуск (placeholders до M2 benchmark):
 
 | Ліміт | Placeholder |
-|---|---|
+| --- | --- |
 | memory | 32 MiB |
 | guest fuel | 50_000_000 |
 | wall-clock (epoch) | 2 s |
@@ -298,7 +298,7 @@ Events: MVP = manual action + on-demand render. Background triggers / scheduler 
 #### Lifecycle
 
 | Подія | Поведінка |
-|---|---|
+| --- | --- |
 | install | verify → consent capabilities → registry → optional activate |
 | update (same caps, trusted key) | replace package; **grants зберігаються**; показати changelog |
 | update (escalation / new key) | re-consent обовʼязково |
@@ -310,7 +310,7 @@ Events: MVP = manual action + on-demand render. Background triggers / scheduler 
 ### 4.8. Error taxonomy → UI
 
 | Failure | User-facing (орієнтир) | Retry |
-|---|---|---|
+| --- | --- | --- |
 | `denied` | Немає дозволу / звузьте scope | Request permission |
 | `invalid-input` | Плагін або host передав некоректні дані | No auto |
 | `timeout` | Плагін не відповів вчасно | Retry |
@@ -345,7 +345,7 @@ Events: MVP = manual action + on-demand render. Background triggers / scheduler 
 ### 4.10. MVP milestones (порядок імплементації)
 
 | # | Milestone | Owner repo | Exit criteria |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | M1 | Package parse/verify/TOFU install + `plugin-dev-cli sign` | `tauri-components` | CLI install local signed package into registry |
 | M2 | Empty Wasm hello lifecycle + **benchmark gate** | `tauri-components` | activate/deactivate + fuel/timeout tests; budgets confirmed or updated |
 | M3 | Mail WIT read-only metadata | `mlmail` + platform | sample plugin reads metadata under grant |
@@ -472,7 +472,7 @@ Host: schedule render refresh (new invocation)
 Коли повертатись — варіанти на вибір:
 
 | Варіант | Опис |
-|---|---|
+| --- | --- |
 | **D2-A** | Централізований Nitra registry ключів + revocation list |
 | **D2-B** | Transparency log (append-only) + user/org pins |
 | **D2-C** | Лише user-managed keys (як TOFU), marketplace тільки CDN |
@@ -482,7 +482,7 @@ Host: schedule render refresh (new invocation)
 ## Changelog документа
 
 | Дата | Зміна |
-|---|---|
+| --- | --- |
 | 2026-08-02 | Початкова версія |
 | 2026-08-02 | Review pass: non-goals, threat model, trust MVP, scope DSL, invocation semantics, lifecycle, milestones, appendix, §10 decisions |
 | 2026-08-03 | Ухвалено D1-A, D3-C, D4-A, D5-A, D6-A, D7-A+C, D8-A; D2 відкладено; статус → готово до MVP |

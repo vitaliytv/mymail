@@ -20,3 +20,4 @@ app/src-tauri/icons/src/icon-manifest.json
 app/src-tauri/resources/newsletter-templates/hackernoon.json
 app/src-tauri/resources/newsletter-templates/tldr.json
 .n-cursor.json
+.forgejo/workflows/release.yml
