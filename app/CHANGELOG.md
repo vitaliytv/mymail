@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.14] - 2026-10-07
+
+### Fixed
+
+- CI-перевірки `Lint Text` і `Lint Security` беруть `shellcheck`, `dotenv-linter` і `trufflehog` з образу раннера: встановлення `dotenv-linter` у job-і падало з `Permission denied`, а `trufflehog` через `docker run` не бачив checkout, тож обидві перевірки з 29.09 не проходили жодного разу.
+
 ## [0.31.13] - 2026-10-06
 
 ### Changed
