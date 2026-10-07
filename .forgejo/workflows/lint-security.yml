@@ -18,16 +18,15 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      # trufflehog@main mounts the checkout at /tmp. The ARM64 runner's action
-      # container has a read-only /tmp, so use a Docker tmpfs for the scanner's
-      # clone scratch space while keeping the checkout read-only.
+      # trufflehog comes with the runner image and scans inside the job container: `docker run`
+      # talks to the podman sidecar, which cannot see this job's checkout. /tmp may be read-only
+      # on the ARM64 runners, so the scanner's scratch space lives in runner.temp.
       - name: Scan Git history for secrets
-        run: |
-          docker run --rm \
-            --volume ".:/repo:ro" \
-            --tmpfs /tmp:rw \
-            ghcr.io/trufflesecurity/trufflehog:latest \
-            git file:///repo \
-            --fail \
-            --no-update \
-            --results=verified,unknown
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: >-
+          trufflehog git file://.
+          --fail
+          --no-update
+          --exclude-paths .trufflehog-exclude
+          --results=verified,unknown
