@@ -3,7 +3,7 @@ type: Vue Component
 title: GmailFiltersDialog.vue
 resource: app/src/components/GmailFiltersDialog.vue
 docgen:
-  crc: d80ba951
+  crc: 10b0d218
   model: openai-codex/gpt-5.5
   tier: cloud-avg
   score: 100
