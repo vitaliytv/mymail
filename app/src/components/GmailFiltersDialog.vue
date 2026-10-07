@@ -118,7 +118,10 @@ function labelName(id) {
  */
 function actionIcons(f) {
   const a = f.action ?? {}
-  const icons = Array.from(a.addLabelIds ?? [], id => SYSTEM_ACTION_ICONS[`add:${id}`] ?? { icon: 'sym_o_label', tooltip: `Мітка: ${labelName(id)}` });
+  const icons = Array.from(
+    a.addLabelIds ?? [],
+    id => SYSTEM_ACTION_ICONS[`add:${id}`] ?? { icon: 'sym_o_label', tooltip: `Мітка: ${labelName(id)}` }
+  )
   for (const id of a.removeLabelIds ?? []) {
     icons.push(
       SYSTEM_ACTION_ICONS[`remove:${id}`] ?? { icon: 'sym_o_label_off', tooltip: `Зняти мітку: ${labelName(id)}` }

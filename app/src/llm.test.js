@@ -30,7 +30,9 @@ describe('useLlm', () => {
   })
 
   it('loads the launch-time URL and auto-resolves an empty model', async () => {
-    invokeMock.mockResolvedValueOnce({ baseUrl: 'http://127.0.0.1:8080/v1/' }).mockResolvedValueOnce(['gemma-4-e4b', 'gemma-4-26b'])
+    invokeMock
+      .mockResolvedValueOnce({ baseUrl: 'http://127.0.0.1:8080/v1/' })
+      .mockResolvedValueOnce(['gemma-4-e4b', 'gemma-4-26b'])
     const { baseUrl, model, loadEnv } = useLlm({ storagePrefix: 'test' })
     await loadEnv()
     expect(baseUrl.value).toBe('http://127.0.0.1:8080/v1/')

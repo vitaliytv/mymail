@@ -15,7 +15,10 @@
           autocomplete="off"
           outlined />
         <q-select v-model="model" :options="models" label="Модель" use-input new-value-mode="add-unique" outlined />
-        <div class="text-caption text-grey-7">Ключ не записується в localStorage. Порожній ключ використовує N_LOCAL_OPENAI_API_KEY, якщо його передано під час запуску.</div>
+        <div class="text-caption text-grey-7">
+          Ключ не записується в localStorage. Порожній ключ використовує N_LOCAL_OPENAI_API_KEY, якщо його передано під
+          час запуску.
+        </div>
         <div v-if="error" class="text-negative text-caption">{{ error }}</div>
         <div v-else-if="status" class="text-positive text-caption">{{ status }}</div>
       </q-card-section>
@@ -65,7 +68,9 @@ async function testConnection() {
   status.value = ''
   try {
     models.value = await refreshModels()
-    status.value = models.value.length ? `З’єднання працює. Моделей: ${models.value.length}.` : 'З’єднання працює, але сервер не повернув моделей.'
+    status.value = models.value.length
+      ? `З’єднання працює. Моделей: ${models.value.length}.`
+      : 'З’єднання працює, але сервер не повернув моделей.'
   } catch (error) {
     error.value = String(error?.message ?? error)
   } finally {
